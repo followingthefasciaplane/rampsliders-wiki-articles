@@ -1,0 +1,813 @@
+https://rampsliders.wiki/doku.php?id=physics:surfsdk13
+
+==== Introduction ====
+
+This document provides an in-depth analysis of the mechanics behind surfing, based on the leaked HL2 engine [[https://github.com/lua9520/source-engine-2018-hl2_src/blob/master/game/shared/gamemovement.cpp|code]].
+
+----
+
+==== Surface Steepness ====
+
+For a surface to be viable for surfing, it must meet specific criteria related to its angle:
+
+  * The surface must be steep enough that the player is considered "in the air" while interacting with it.
+  * Technically, the Z component of the surface's normal vector must be less than 0.7.
+  * This condition ensures that the player is treated as "in the air" rather than "on the ground" when touching the surface.
+
+----
+
+==== How Surfing Works ====
+
+The fundamental concept in surfing is the interaction between the player and inclined surfaces:
+
+  * When a player collides with a sloped surface, their velocity is adjusted using the ''ClipVelocity'' function.
+  * ''ClipVelocity'' removes the component of velocity perpendicular to the surface, leaving only the component parallel to the surface.
+  * Gravity is applied every tick, adding downward velocity.
+  * The combination of gravity and the surface angle creates acceleration along the slope.
+  * Air acceleration allows the player to translate the Z velocity from Gravity into XY velocity along the surface.
+
+----
+
+==== Key Functions ====
+
+Several key functions and concepts work together to enable surfing:
+
+  * ''TryPlayerMove'': Handles collision detection and response.
+  * ''AirMove'': Manages player movement while in the air.
+  * ''AirAccelerate'': Applies acceleration to the player while airborne.
+  * ''ClipVelocity'': Adjusts player velocity upon collision with surfaces.
+  * ''AddGravity'', ''StartGravity'', ''FinishGravity'': Continuously adds downward velocity to the player.
+
+----
+
+==== Movement and Physics Terms ====
+
+=== Velocity ===
+  * **Definition**: The player's current speed and direction in 3D space, represented as a vector with x, y, and z components.
+  * **Note**: In the context of surfing, "units" often refers to the magnitude of the horizontal (X and Y) components of velocity, while velocity itself is the full 3D vector.
+
+=== Wishdir ===
+  * **Definition**: The normalized direction vector in which the player wishes to move, based on their input and view direction.
+  * **Significance**: Determines the direction of the player's intended movement.
+
+=== Wishspeed ===
+  * **Definition**: The scalar speed at which the player intends to move, calculated based on the player's input.
+  * **Significance**: Determines the magnitude of the player's intended movement, used to scale the wishdir to form the wishvel.
+
+=== Wishvel ===
+  * **Definition**: The velocity vector that the player intends to have, calculated using wishdir and wishspeed.
+  * **Significance**: Combines both direction (wishdir) and speed (wishspeed) to form the complete desired velocity vector, used to adjust the player's current velocity.
+
+=== Air Max Wishspeed ===
+  * **Definition**: A cap on the wishspeed when the player is in the air, set to limit the maximum air acceleration. By default, it's set to 30 and cannot be changed without external tools.
+  * **Significance**: Limits the maximum amount of velocity that can be added through air acceleration per tick, preventing indefinite acceleration in the air.
+
+=== Veer ===
+  * **Definition**: The difference between the player's current velocity and their desired velocity (wishvel).
+  * **Significance**: Indicates how much the player wants to change their movement direction and speed, guiding how much acceleration is needed.
+
+=== Gravity ===
+  * **Definition**: A constant downward force applied to the player, simulated by continuously decreasing the player's Z velocity each tick.
+  * **Significance**: Crucial for surfing as it provides the constant downward acceleration that, when combined with ramp angles, results in forward acceleration.
+
+=== Surface Normal ===
+  * **Definition**: A vector perpendicular to a surface, used to determine how the player's velocity should be adjusted upon collision.
+  * **Significance**: For a surf ramp, this represents the angle of the ramp's slope and is crucial in determining how the player's velocity is affected when surfing.
+
+=== Origin ===
+  * **Definition**: The player's current position in 3D space, specified by x, y, and z coordinates in a Vector.
+
+=== Backoff ===
+  * **Definition**: In the context of ''ClipVelocity'', the amount of velocity directed into a surface that needs to be removed to prevent penetration.
+  * **Calculation**: Determined by the dot product of the incoming velocity and the surface normal, scaled by the overbounce factor.
+
+=== Overbounce ===
+  * **Definition**: A factor in ''ClipVelocity'' that determines how much of the velocity component directed into a surface is negated.
+  * **Significance**: Affects how "bouncy" surfaces are. This is usually always left at 1.0.
+
+----
+
+==== Game Settings and Functions ====
+
+=== sv_airaccelerate ===
+  * **Definition**: A game setting that determines the rate at which a player can accelerate towards ''wishdir''.
+  * **Significance**: Higher values allow for quicker direction and speed changes in the air.
+
+=== Frametime ===
+  * **Definition**: The time interval between server ticks, typically represented in seconds.
+  * **Significance**: Used in various calculations to ensure consistent physics. Occasionally it can vary, but for most calculations it is clamped to tick interval.
+
+=== ClipVelocity ===
+  * **Definition**: A function that adjusts the player's velocity when colliding with a surface.
+  * **Significance**: Critical for surfing, as a good surfer is essentially just somebody who can get good ''ClipVelocity'' calls.
+
+=== TryPlayerMove ===
+  * **Definition**: A function that handles player movement, including collision detection and response.
+  * **Significance**: Coordinates the overall movement process, including calling ClipVelocity when necessary.
+
+=== AirMove ===
+  * **Definition**: A function that handles player movement while in the air.
+  * **Significance**: Manages air control and calls AirAccelerate to apply air acceleration.
+
+=== AirAccelerate ===
+  * **Definition**: A function that applies acceleration to the player while in the air.
+  * **Significance**: Allows players to gain speed and maneuver in the air.
+
+=== StartGravity, AddGravity, FinishGravity ===
+  * **Definition**: Functions that apply gravity to the player's velocity at different points in the movement calculation.
+  * **Significance**: Provide the constant downward acceleration necessary for surfing mechanics.
+
+----
+
+==== CGameMovement::TryPlayerMove ====
+
+''TryPlayerMove'' is a core function in the Source engine's movement system. It handles collision detection and response, allowing the player to move through the game world while interacting with surfaces and obstacles.
+
+=== 1. Initialization ===
+
+<code cpp>
+int bumpcount, numbumps;
+Vector dir;
+float d;
+int numplanes;
+Vector planes[MAX_CLIP_PLANES];
+Vector primal_velocity, original_velocity;
+Vector new_velocity;
+int i, j;
+trace_t pm;
+Vector end;
+float time_left, allFraction;
+int blocked;
+
+numbumps = 4;  // Bump up to four times
+blocked = 0;   // Assume not blocked
+numplanes = 0; // and not sliding along any planes
+
+VectorCopy(mv->m_vecVelocity, original_velocity);  // Store original velocity
+VectorCopy(mv->m_vecVelocity, primal_velocity);
+
+allFraction = 0;
+time_left = gpGlobals->frametime;  // Total time for this movement operation.
+
+new_velocity.Init();
+</code>
+
+  * Sets up variables for collision handling, including ''bumpcount'', ''numbumps'', ''numplanes'', and ''blocked''.
+  * Stores the original velocity and calculates the time left for the movement.
+
+=== 2. Main Movement Loop ===
+
+<code cpp>
+for (bumpcount=0 ; bumpcount < numbumps; bumpcount++)
+{
+    if (mv->m_vecVelocity.Length() == 0.0)
+        break;
+
+    // Calculate end position
+    VectorMA(mv->GetAbsOrigin(), time_left, mv->m_vecVelocity, end);
+
+    // Perform trace
+    TracePlayerBBox(mv->GetAbsOrigin(), end, PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, pm);
+
+    allFraction += pm.fraction;
+
+    // Check for being stuck in a solid object
+    if (pm.allsolid)
+    {
+        VectorCopy(vec3_origin, mv->m_vecVelocity);
+        return 4;
+    }
+
+    // Move if we're not blocked
+    if (pm.fraction > 0)
+    {
+        // Check for precision issues
+        if (numbumps > 0 && pm.fraction == 1)
+        {
+            trace_t stuck;
+            TracePlayerBBox(pm.endpos, pm.endpos, PlayerSolidMask(), COLLISION_GROUP_PLAYER_MOVEMENT, stuck);
+            if (stuck.startsolid || stuck.fraction != 1.0f)
+            {
+                VectorCopy(vec3_origin, mv->m_vecVelocity);
+                break;
+            }
+        }
+
+        // Update position and reset plane count
+        mv->SetAbsOrigin(pm.endpos);
+        VectorCopy(mv->m_vecVelocity, original_velocity);
+        numplanes = 0;
+    }
+
+    // Check if we've moved the entire distance
+    if (pm.fraction == 1)
+        break;
+
+    // Add entity we collided with to touched list
+    MoveHelper()->AddToTouched(pm, mv->m_vecVelocity);
+
+    // Check if we hit a floor or wall
+    if (pm.plane.normal[2] > 0.7)
+        blocked |= 1;  // floor
+    if (!pm.plane.normal[2])
+        blocked |= 2;  // step / wall
+
+    // Reduce remaining time
+    time_left -= time_left * pm.fraction;
+
+    // Store the impact plane
+    if (numplanes >= MAX_CLIP_PLANES)
+    {
+        VectorCopy(vec3_origin, mv->m_vecVelocity);
+        break;
+    }
+    VectorCopy(pm.plane.normal, planes[numplanes]);
+    numplanes++;
+
+    // Handle velocity modification
+    if (numplanes == 1 && player->GetMoveType() == MOVETYPE_WALK && player->GetGroundEntity() == NULL)
+    {
+        // Reflect velocity for first impact when airborne
+        for (i = 0; i < numplanes; i++)
+        {
+            if (planes[i][2] > 0.7)
+            {
+                // floor or slope
+                ClipVelocity(original_velocity, planes[i], new_velocity, 1);
+                VectorCopy(new_velocity, original_velocity);
+            }
+            else
+            {
+                // wall
+                ClipVelocity(original_velocity, planes[i], new_velocity, 1.0 + sv_bounce.GetFloat() * (1 - player->m_surfaceFriction));
+            }
+        }
+        VectorCopy(new_velocity, mv->m_vecVelocity);
+        VectorCopy(new_velocity, original_velocity);
+    }
+    else
+    {
+        // Handle multiple plane collisions
+        for (i = 0; i < numplanes; i++)
+        {
+            ClipVelocity(original_velocity, planes[i], mv->m_vecVelocity, 1);
+            for (j = 0; j < numplanes; j++)
+                if (j != i && mv->m_vecVelocity.Dot(planes[j]) < 0)
+                    break;
+            if (j == numplanes)
+                break;
+        }
+
+        if (i == numplanes)
+        {
+            if (numplanes != 2)
+            {
+                VectorCopy(vec3_origin, mv->m_vecVelocity);
+                break;
+            }
+            CrossProduct(planes[0], planes[1], dir);
+            dir.NormalizeInPlace();
+            d = dir.Dot(mv->m_vecVelocity);
+            VectorScale(dir, d, mv->m_vecVelocity);
+        }
+
+        if (mv->m_vecVelocity.Dot(primal_velocity) <= 0)
+        {
+            VectorCopy(vec3_origin, mv->m_vecVelocity);
+            break;
+        }
+    }
+}
+</code>
+
+This main loop handles the core collision detection and response:
+  * It iterates up to ''numbumps'' times (default 4) to handle multiple collisions.
+  * For each iteration, it calculates the end position, performs a trace, and updates the player's position if not blocked.
+  * It handles collisions with surfaces, adjusting velocity using ''ClipVelocity''.
+  * It deals with special cases like sliding along multiple planes.
+
+=== 3. Final Checks and Adjustments ===
+
+<code cpp>
+if (allFraction == 0)
+{
+    VectorCopy(vec3_origin, mv->m_vecVelocity);
+}
+
+// Check for slamming into a wall
+float fSlamVol = 0.0f;
+float fLateralStoppingAmount = primal_velocity.Length2D() - mv->m_vecVelocity.Length2D();
+if (fLateralStoppingAmount > PLAYER_MAX_SAFE_FALL_SPEED * 2.0f)
+    fSlamVol = 1.0f;
+else if (fLateralStoppingAmount > PLAYER_MAX_SAFE_FALL_SPEED)
+    fSlamVol = 0.85f;
+
+PlayerRoughLandingEffects(fSlamVol);
+
+return blocked;
+</code>
+
+  * If no movement occurred, velocity is set to zero.
+  * Checks for sudden stops (slamming into walls) and applies appropriate effects.
+  * Returns the ''blocked'' status, indicating what type of collision occurred (floor or wall/step).
+
+=== Key Behavior for Surfing ===
+
+  * **Sliding Along Surfaces**: The function allows the player to slide along surfaces when colliding.
+
+  * **Multiple Collision Handling**: It can handle multiple collisions per frame, allowing for complex interactions with surf ramps and other surfaces.
+
+  * **Velocity Adjustment**: The ''ClipVelocity'' calls adjust the player's velocity upon collision.
+
+  * **Air Movement**: Special handling for collisions while airborne (when ''GetGroundEntity()'' is NULL) allows for the characteristic behavior of "sticking" to surf ramps without falling off.
+
+  * **Precision Checks**: The function includes checks to prevent getting stuck in surfaces.
+
+This ''TryPlayerMove'' function, in conjunction with ''ClipVelocity'', forms the core of the surfing mechanic in Source engine games. It allows players to maintain their momentum along surfaces, handle multiple surface interactions in a single frame, and provides the foundation for the smooth, fluid movement that characterizes surfing.
+
+----
+
+==== CGameMovement::ClipVelocity ====
+
+The ''ClipVelocity'' function is a critical component in the Source engine's movement system. It's responsible for adjusting the player's velocity when colliding with surfaces. This function is especially important for surfing mechanics, as it determines how the player's velocity changes when interacting with surf ramps.
+
+=== Parameters ===
+
+  * ''Vector& in'': The incoming velocity vector
+  * ''Vector& normal'': The normal vector of the surface being collided with
+  * ''Vector& out'': The resulting velocity vector after the collision
+  * ''float overbounce'': A factor that determines how much the velocity should "bounce" off the surface
+
+=== Return Value ===
+
+An integer representing the type of surface the collision occurred with:
+  * ''0x00'': Unblocked
+  * ''0x01'': Floor
+  * ''0x02'': Wall/Step
+  * ''0x03'': Both floor and wall/step
+
+=== 1. Surface Type Determination ===
+
+<code cpp>
+float angle;
+int blocked;
+
+angle = normal[2];
+blocked = 0x00;         // Assume unblocked.
+if (angle > 0)          // If the plane that is blocking us has a positive z component, then assume it's a floor.
+    blocked |= 0x01;    
+if (!angle)             // If the plane has no Z, it is vertical (wall/step)
+    blocked |= 0x02;    
+</code>
+
+  * Determines the type of surface based on the Z component of the normal vector.
+  * A positive Z component indicates a floor-like surface.
+  * A zero Z component indicates a vertical surface (wall or step).
+
+=== 2. Velocity Adjustment Calculation ===
+
+<code cpp>
+float backoff;
+float change;
+int i;
+
+// Determine how far along plane to slide based on incoming direction.
+backoff = DotProduct(in, normal) * overbounce;
+for (i = 0; i < 3; i++)
+{
+    change = normal[i] * backoff;
+    out[i] = in[i] - change;
+}
+</code>
+
+  * Calculates the amount of velocity to remove (backoff) based on how much the incoming velocity is going into the surface.
+  * The ''overbounce'' factor affects how much of this velocity is removed.
+  * Adjusts each component of the velocity vector to remove the calculated amount.
+
+=== 3. Prevent Penetration ===
+
+<code cpp>
+// iterate once to make sure we aren't still moving through the plane
+float adjust = DotProduct(out, normal);
+if (adjust < 0.0f)
+{
+    out -= (normal * adjust);
+    // Msg( "Adjustment = %lf\n", adjust );
+}
+</code>
+
+  * Checks if the resulting velocity is still moving into the surface.
+  * If so, it further adjusts the velocity to prevent penetration.
+
+=== 4. Return Result ===
+
+<code cpp>
+// Return blocking flags.
+return blocked;
+</code>
+
+  * Returns the ''blocked'' value, indicating what type of surface was hit, if at all.
+
+=== Key Behavior for Surfing ===
+
+  * **Velocity Preservation**: By removing only the component of velocity going into the surface, ''ClipVelocity'' is what makes a surfer good or bad at surfing, since you want to minimize this. 
+
+  * **Angle Sensitivity**: The amount of velocity adjustment depends on the angle of collision. For example, you want to board a ramp with a velocity vector parallel to the surface normal of the ramp, for maximum efficiency.
+
+  * **Overbounce Factor**: The ''overbounce'' parameter is typically 1.0 for normal surfaces, including surf ramps. This setting is crucial for surfing mechanics:
+    * With ''overbounce'' at 1.0, the function removes exactly the amount of velocity going into the surface.
+    * This prevents any "bouncing" effect off the ramps, allowing surfers to smoothly glide along the surface.
+    * If ''overbounce'' were higher (e.g., 1.1), surfers would slightly bounce off ramps, disrupting smooth movement.
+    * If it were lower (e.g., 0.9), surfers would "sink" into ramps, losing speed.
+
+  * **Surface Type Detection**: The function determines whether the collision is with a floor-like surface or a wall-like surface, which can be used by other parts of the movement code to handle different types of collisions appropriately.
+
+  * **Penetration Prevention**: The final adjustment ensures that the player doesn't end up moving into the surface, for sanity.
+
+=== Importance in Surfing Mechanics ===
+
+The ''ClipVelocity'' function is fundamental to the surfing mechanic in Source engine games:
+
+  * It allows players to maintain their speed along the surface of a ramp, converting vertical velocity into horizontal velocity.
+  * The preservation of velocity parallel to the surface is what allows players to gain speed when moving down a ramp and maintain speed when moving up.
+  * By accurately handling collisions with surfaces at various angles, it enables the smooth transitions between different sections of a surf ramp.
+  * Gaining height in surfing comes from the player's initial speed being resolved into positive Z velocity when combined with air strafing.
+
+----
+
+===== Air Movement in Source Engine: Comprehensive Breakdown =====
+
+Air movement in the Source engine is primarily handled by two functions: ''AirMove'' and ''AirAccelerate''. This article provides a detailed analysis of these functions, explaining their role in creating the characteristic feel of air control in Source games.
+
+==== CGameMovement::AirMove ====
+
+The ''AirMove'' function is responsible for handling player movement while in the air. It calculates the desired movement direction and speed based on player input, applies air acceleration, and attempts to move the player accordingly.
+
+=== Function Breakdown ===
+
+<code cpp>
+void CGameMovement::AirMove( void )
+{
+    int         i;
+    Vector      wishvel;
+    float       fmove, smove;
+    Vector      wishdir;
+    float       wishspeed;
+    Vector forward, right, up;
+
+    AngleVectors (mv->m_vecViewAngles, &forward, &right, &up);  // Determine movement angles
+    
+    // Copy movement amounts
+    fmove = mv->m_flForwardMove;
+    smove = mv->m_flSideMove;
+    
+    // Zero out z components of movement vectors
+    forward[2] = 0;
+    right[2]   = 0;
+    VectorNormalize(forward);  // Normalize remainder of vectors
+    VectorNormalize(right);    // 
+
+    for (i=0 ; i<2 ; i++)       // Determine x and y parts of velocity
+        wishvel[i] = forward[i]*fmove + right[i]*smove;
+    wishvel[2] = 0;             // Zero out z part of velocity
+
+    VectorCopy (wishvel, wishdir);   // Determine maginitude of speed of move
+    wishspeed = VectorNormalize(wishdir);
+
+    //
+    // clamp to server defined max speed
+    //
+    if ( wishspeed != 0 && (wishspeed > mv->m_flMaxSpeed))
+    {
+        VectorScale (wishvel, mv->m_flMaxSpeed/wishspeed, wishvel);
+        wishspeed = mv->m_flMaxSpeed;
+    }
+    
+    AirAccelerate( wishdir, wishspeed, sv_airaccelerate.GetFloat() );
+
+    // Add in any base velocity to the current velocity.
+    VectorAdd(mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+
+    TryPlayerMove();
+
+    // Now pull the base velocity back out.   Base velocity is set if you are on a moving object, like a conveyor (or maybe another monster?)
+    VectorSubtract( mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity );
+}
+</code>
+
+=== Detailed Analysis ===
+
+  * **Movement Angle Calculation**:
+    * ''AngleVectors'' is used to convert the player's view angles into forward, right, and up vectors.
+    * This allows the function to determine the direction the player is facing.
+
+  * **Input Processing**:
+    * ''fmove'' and ''smove'' store the forward and sideways movement inputs respectively.
+    * These values represent the player's intended movement direction.
+
+  * **Wishvel Calculation**:
+    * The function calculates ''wishvel'', the desired velocity vector.
+    * It combines the normalized forward and right vectors with the movement inputs.
+    * The z-component is zeroed out, constraining movement to the horizontal plane.
+
+  * **Wishspeed Normalization**:
+    * ''wishdir'' is set to the normalized ''wishvel''.
+    * ''wishspeed'' stores the magnitude of the desired velocity.
+
+  * **Speed Clamping**:
+    * If ''wishspeed'' exceeds ''mv->m_flMaxSpeed'', it's clamped to this maximum value.
+    * This prevents players from exceeding the max velocity.
+
+  * **Air Acceleration**:
+    * Calls ''AirAccelerate'' with the calculated ''wishdir'', ''wishspeed'', and the value of ''sv_airaccelerate'' cvar.
+
+  * **Base Velocity Handling**:
+    * Adds the player's base velocity (from moving platforms, etc.) to the current velocity.
+    * After movement calculation, it subtracts the base velocity again.
+    * This allows for correct interaction with moving objects in the game world.
+
+  * **Movement Execution**:
+    * Calls ''TryPlayerMove'' to actually move the player, handling collisions and other physics interactions.
+
+----
+
+==== CGameMovement::AirAccelerate ====
+
+The ''AirAccelerate'' function is crucial for changing the player's velocity while in the air. It's key to allowing skilled players to gain speed during air movement.
+
+=== Function Breakdown ===
+
+<code cpp>
+void CGameMovement::AirAccelerate( Vector& wishdir, float wishspeed, float accel )
+{
+    int i;
+    float addspeed, accelspeed, currentspeed;
+    float wishspd;
+
+    wishspd = wishspeed;
+    
+    if (player->pl.deadflag)
+        return;
+    
+    if (player->m_flWaterJumpTime)
+        return;
+
+    // Cap speed
+    if ( wishspd > GetAirSpeedCap() )
+        wishspd = GetAirSpeedCap();
+
+    // Determine veer amount
+    currentspeed = mv->m_vecVelocity.Dot(wishdir);
+
+    // See how much to add
+    addspeed = wishspd - currentspeed;
+
+    // If not adding any, done.
+    if (addspeed <= 0)
+        return;
+
+    // Determine acceleration speed after acceleration
+    accelspeed = accel * wishspeed * gpGlobals->frametime * player->m_surfaceFriction;
+
+    // Cap it
+    if (accelspeed > addspeed)
+        accelspeed = addspeed;
+    
+    // Adjust pmove vel.
+    for (i=0 ; i<3 ; i++)
+    {
+        mv->m_vecVelocity[i] += accelspeed * wishdir[i];
+        mv->m_outWishVel[i] += accelspeed * wishdir[i];
+    }
+}
+</code>
+
+=== Detailed Analysis ===
+
+  * **Initial Checks**:
+    * Returns immediately if the player is dead or water jumping.
+    * This prevents unnecessary calculations in these states.
+
+  * **Speed Capping**:
+    * Caps ''wishspd'' to ''GetAirSpeedCap()''.
+    * This function returns a configurable maximum air speed, which is almost always 30, preventing excessive acceleration.
+
+  * **Current Speed Calculation**:
+    * Uses dot product to calculate the player's current speed based on ''veer'' toward the ''wishdir''.
+    * This is crucial for determining how much additional speed can be added.
+
+  * **Additional Speed Calculation**:
+    * Calculates ''addspeed'' as the difference between desired and current speed.
+    * If ''addspeed'' is <= 0, the function exits early as no acceleration is needed.
+
+  * **Acceleration Calculation**:
+    * Calculates ''accelspeed'' based on ''sv_airaccelerate'', ''wishspeed'', and frametime.
+    * This determines how much speed will be added this frame, toward the ''wishdir''.
+
+  * **Acceleration Capping**:
+    * Ensures ''accelspeed'' doesn't exceed ''addspeed''.
+    * This prevents overshooting the desired speed.
+
+  * **Velocity Adjustment**:
+    * Adds the calculated acceleration to the player's velocity in the ''wishdir'' direction.
+    * Updates ''m_outWishVel''.
+
+=== Key Implications for Air Movement and Surfing ===
+
+  * **Speed Control**: The speed cap and acceleration calculations allow for fine-tuned control over player movement.
+
+  * **Directional Acceleration**: By using ''wishdir'', players can gain speed by turning into their movement direction.
+
+  * **Precision Movement**: The careful capping and adjustment of acceleration allow for precise control and simulation in the air. This is a limit on the vector projection itself.
+
+  * **Interaction with Surf Ramps**: When ''AirMove'' calls ''TryPlayerMove'', it initiates the process of collision detection and updating the players velocity and location each tick:
+    * As the player moves through the air, ''TryPlayerMove'' detects collisions with the ramp surfaces.
+    * Upon collision, it calls ''ClipVelocity'' to adjust the player's velocity relative to the ramp angle.
+    * The air acceleration applied by ''AirAccelerate'' enables players to not fall off the ramp.
+    * This interaction allows players to "stick" to ramps while maintaining their speed and momentum.
+
+The interplay between ''AirMove'', ''AirAccelerate'', and ''TryPlayerMove'' creates the foundation for the complex and skill-based air movement system in Source engine games. This system allows for advanced techniques like surfing, bunny-hopping, and precise air control, which have become hallmarks of the engine's movement mechanics.
+
+----
+
+===== Gravity Application in Source Engine =====
+
+The Source engine applies gravity through three main functions: ''StartGravity'', ''AddGravity'', and ''FinishGravity''. These functions work together to simulate the continuous effect of gravity on the player throughout a frame.
+
+==== CGameMovement::StartGravity ====
+
+This function applies the initial half of the gravity effect at the start of a movement frame.
+
+<code cpp>
+void CGameMovement::StartGravity( void )
+{
+    float ent_gravity;
+    
+    if (player->GetGravity())
+        ent_gravity = player->GetGravity();
+    else
+        ent_gravity = 1.0;
+
+    // Add gravity so they'll be in the correct position during movement
+    // yes, this 0.5 looks wrong, but it's not.  
+    mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * 0.5 * gpGlobals->frametime );
+    mv->m_vecVelocity[2] += player->GetBaseVelocity()[2] * gpGlobals->frametime;
+
+    Vector temp = player->GetBaseVelocity();
+    temp[ 2 ] = 0;
+    player->SetBaseVelocity( temp );
+
+    CheckVelocity();
+}
+</code>
+
+Key points:
+  * Applies half of the frame's gravity to the player's vertical velocity.
+  * Adds any vertical base velocity (e.g., from moving platforms).
+  * Resets the vertical component of base velocity to zero.
+  * Uses the player's custom gravity if set, otherwise uses default gravity (1.0).
+  * Calls ''CheckVelocity()'' to ensure the velocity is within acceptable limits.
+
+----
+
+==== CGameMovement::AddGravity ====
+
+This function adds the full gravity effect to the player's velocity. It's typically used when gravity needs to be applied in one go, rather than split across the frame.
+
+<code cpp>
+void CGameMovement::AddGravity( void )
+{
+    float ent_gravity;
+
+    if ( player->m_flWaterJumpTime )
+        return;
+
+    if (player->GetGravity())
+        ent_gravity = player->GetGravity();
+    else
+        ent_gravity = 1.0;
+
+    // Add gravity incorrectly
+    mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime);
+    mv->m_vecVelocity[2] += player->GetBaseVelocity()[2] * gpGlobals->frametime;
+    Vector temp = player->GetBaseVelocity();
+    temp[2] = 0;
+    player->SetBaseVelocity( temp );
+    
+    CheckVelocity();
+}
+</code>
+
+Key points:
+  * Applies the full frame's gravity to the player's vertical velocity.
+  * Skips gravity application if the player is water jumping.
+  * Adds vertical base velocity and resets it, similar to ''StartGravity''.
+  * Uses the player's custom gravity if set, otherwise uses default gravity (1.0).
+  * Calls ''CheckVelocity()'' to ensure the velocity is within acceptable limits.
+  * Note: This might be a legacy or special-case implementation, not entirely sure.
+
+----
+
+==== CGameMovement::FinishGravity ====
+
+This function applies the remaining half of the gravity effect at the end of a movement frame.
+
+<code cpp>
+void CGameMovement::FinishGravity( void )
+{
+    float ent_gravity;
+
+    if ( player->m_flWaterJumpTime )
+        return;
+
+    if ( player->GetGravity() )
+        ent_gravity = player->GetGravity();
+    else
+        ent_gravity = 1.0;
+
+    // Get the correct velocity for the end of the dt 
+    mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime * 0.5);
+
+    CheckVelocity();
+}
+</code>
+
+Key points:
+  * Applies the remaining half of the frame's gravity to the player's vertical velocity.
+  * Skips gravity application if the player is water jumping.
+  * Does not add base velocity or reset it, as this was done in ''StartGravity'' or ''AddGravity''.
+  * Uses the player's custom gravity if set, otherwise uses default gravity (1.0).
+  * Calls ''CheckVelocity()'' to ensure the velocity is within acceptable limits.
+
+----
+
+==== Importance for Surfing ====
+
+The gravity functions play a crucial role in surfing mechanics:
+
+  * **Continuous Acceleration**: By applying gravity throughout the frame, these functions create a constant downward acceleration. 
+
+  * **Interaction with Ramps**: The downward velocity from gravity, when combined with ''ClipVelocity'' on angled surfaces, results in forward acceleration. This is the core principle that allows surfers to gain speed on ramps. Here's how it works:
+    * Gravity adds a downward component to the player's velocity vector.
+    * When this velocity vector intersects with an angled ramp surface, ''ClipVelocity'' removes the component perpendicular to the surface.
+    * The remaining velocity is parallel to the ramp surface, which has both downward and forward components determined by ''AirMove'', which calls ''AirAccelerate'' to determine these components.
+    * As gravity continues to apply, it adds more downward velocity, which again gets partially converted to forward velocity along the ramp.
+
+----
+
+===== Example Flow =====
+
+  * Player is in the air
+  * Player has some initial velocity
+  * Player is approaching a downward-sloping surf ramp
+
+----
+
+==== Execution Flow: ====
+
+  * **1. Frame Start:**
+    * Function: ''CGameMovement::StartGravity()''
+    * Role: Applies the initial half of gravity for this frame.
+    * Effect: Increases the player's downward velocity slightly.
+
+  * **2. Air Movement Calculation:**
+    * Function: ''CGameMovement::AirMove()''
+    * Role: Calculates the player's intended movement based on input.
+    * Effect: Determines the player's wishdir and wishspeed based on their input.
+
+  * **3. Air Acceleration:**
+    * Function: ''CGameMovement::AirAccelerate()''
+    * Role: Applies acceleration to the player's velocity based on their input.
+    * Effect: Slightly adjusts the player's velocity in the direction they're aiming.
+
+  * **4. Movement Attempt:**
+    * Function: ''CGameMovement::TryPlayerMove()''
+    * Role: Attempts to move the player and handles collisions.
+    * Effect: Detects that the player is about to collide with the surf ramp.
+
+  * **5. Collision Handling:**
+    * Function: ''CGameMovement::ClipVelocity()''
+    * Role: Adjusts the player's velocity based on the collision with the ramp.
+    * Effect: 
+      * Removes the component of velocity going into the ramp.
+      * Preserves the component of velocity along the ramp.
+
+  * **6. Continued Movement:**
+    * Function: ''CGameMovement::TryPlayerMove()'' (continued)
+    * Role: Continues moving the player along the adjusted trajectory.
+
+  * **7. Frame End Gravity:**
+    * Function: ''CGameMovement::FinishGravity()''
+    * Role: Applies the second half of gravity for this frame.
+    * Effect: Further increases downward velocity, which gets partially converted to forward velocity along the ramp in the next frame.
+
+**Throughout this process:**
+  * ''CheckVelocity()'' is called regularly to ensure the player's speed doesn't exceed engine limits.
+  * The player's position is updated each frame based on their velocity.
+  * Gravity is continually applied, affecting the player's trajectory.
+
+----
+
+==== Conclusion ====
+
+I will periodically update this document. This is DRAFT #2. Dated 7/15/2024.
