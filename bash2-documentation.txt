@@ -1,0 +1,793 @@
+https://rampsliders.wiki/doku.php?id=plugins:bash2
+
+==== Overview ====
+
+BASH (Blacky's Anti-Strafehack) is a SourceMod plugin designed to detect and punish strafe hacking in Counter-Strike: Source and Counter-Strike: Global Offensive servers. This documentation provides a comprehensive overview of the plugin's detection vectors, code logic, and configuration options, enabling server owners to understand, tune, and effectively utilize the plugin to enforce fair play.
+
+----
+
+==== Introduction ====
+
+Strafe hacking is a cheating technique that allows players to gain unfair speed and movement advantages by exploiting the game's movement mechanics. BASH aims to identify and counter these exploits by analyzing player movement patterns, button presses, and timing discrepancies.
+
+----
+
+==== Detection Vectors ====
+
+BASH employs a multi-faceted approach to strafe hack detection, utilizing the following key vectors:
+
+=== 1. Start/End Strafe Analysis ===
+
+**Overview**
+
+This detection vector focuses on identifying abnormal patterns in player movement, specifically related to the timing of key presses and directional changes during strafing. It analyzes both the start and end of strafes, looking for inconsistencies and patterns that indicate potential strafe hacking.
+
+**Key Components**
+
+  * **Tick Difference Tracking**: Records the time difference (in ticks) between a player pressing a movement key and the subsequent change in their turning direction.
+  * **Identical Strafe Detection**: Tracks consecutive strafes with identical tick differences, which can indicate automated or scripted strafing.
+  * **Timing Analysis**: Tracks the percentage of time a player spends "timing" their strafes, potentially indicating the use of external tools or scripts to optimize movement.
+
+**Detection Logic**
+
+  * Analyzes the last ''MAX_FRAMES'' (default: 50) start strafes and ''MAX_FRAMES'' end strafes.
+  * Calculates the mean and standard deviation of tick differences for both start and end strafes.
+  * Triggers warnings or bans based on low standard deviations (indicating highly consistent timing) or high numbers of identical strafes.
+  * Detects patterns such as too many identical strafes in a row (configurable via ''IDENTICAL_STRAFE_MIN'').
+  * Considers whether the player is being timed by the Shavit timer plugin (if integrated) for more accurate detection.
+
+**Detection Reasons**
+  * ''DR_StartStrafe_LowDeviation'': Very likely strafe hacks when < 1.0 (Warns admins)
+  * ''DR_StartStrafe_AlwaysPositive'': Potential indicator of anticheat bypass attempts (Warns admins)
+  * ''DR_EndStrafe_LowDeviation'': Very likely strafe hacks when < 1.0 (Warns admins)
+  * ''DR_EndStrafe_AlwaysPositive'': Potential indicator of anticheat bypass attempts (Warns admins)
+  * ''DR_StartStrafeMatchesEndStrafe'': Potential angle delay hack (Logged for analysis)
+
+----
+
+=== 2. Key Switch Analysis ===
+
+**Overview**
+
+This detection vector focuses on identifying abnormal patterns in how players switch between movement keys and other buttons, such as mouse buttons. It analyzes the timing of key presses and releases, looking for inconsistencies and patterns that suggest potential strafe hacking or other forms of cheating.
+
+**Key Components**
+
+  * **Movement Key Switch Analysis**: Records the time difference between releasing one movement key and pressing the opposite movement key.
+  * **Button Key Switch Analysis**: Similar to movement key switches, but focuses on other buttons (e.g., mouse buttons).
+  * **Null Movement Stats Detection**: Identifies instances where players have a high percentage of zero-tick (null) key switch times, which can indicate the use of scripts or macros to automate movement.
+
+**Detection Logic**
+
+  * Analyzes the last ''MAX_FRAMES_KEYSWITCH'' (default: 50) key switches for both movement keys and other buttons.
+  * Calculates the mean, standard deviation, and percentage of positive and null switch times.
+  * Triggers warnings or kicks based on abnormally consistent switch times (low standard deviation) or high percentages of null switches.
+  * Considers whether the player is being timed by the Shavit timer plugin (if integrated) for more accurate detection.
+
+**Detection Reasons**
+  * ''DR_KeySwitchesTooPerfect'': Could indicate use of a movement config or anti-ghosting keyboard (Warns admins)
+
+----
+
+=== 3. Illegal Turning and Movement Analysis ===
+
+**Overview**
+
+This detection vector focuses on identifying abnormal turning rates, movement inconsistencies, and impossible actions that can only be achieved through cheating or exploitation of game mechanics. It analyzes player movement and turning behavior, looking for deviations from expected patterns and limitations.
+
+**Key Components**
+
+  * **Illegal Yaw Value Detection**: Analyzes player turning rates in relation to their mouse settings and other relevant client variables, identifying turning speeds that exceed legitimate limits.
+  * **Invalid Button/Sidemove Combination Detection**: Checks for inconsistencies between pressed movement keys and actual sidemove velocity, detecting potential strafe hacking or movement manipulation.
+  * **Impossible Sidemove Value Detection**: Identifies sidemove velocities that are impossible to achieve legitimately, indicating potential cheating or exploits.
+  * **Angle Snap Detection**: Detects sudden and significant angle changes occurring within a single tick, which can suggest the use of aimbots or other cheats.
+  * **W-only Hack Detection**: Identifies patterns consistent with "W-only" strafe hacking techniques.
+
+**Detection Logic**
+
+  * Performs checks every 100 ticks for illegal yaw values.
+  * Continuously monitors for invalid button and sidemove combinations.
+  * Analyzes angle changes for potential "angle snap" or "silent aim" cheats.
+  * Considers various mouse settings (m_yaw, m_customaccel, sensitivity) and game-specific variables (cl_yawspeed).
+  * Accounts for potential false positives from legitimate sources like func_rotating entities or teleportation.
+
+**Detection Reasons**
+  * ''DR_ButtonsAndSideMoveDontMatch'': Inconsistencies between buttons and movement (Ban/Warn based on severity)
+  * ''DR_ImpossibleSideMove'': Could be +strafe or controller, but likely strafe hack (Warn admins/Stop player movements)
+  * ''DR_AngleDelay'': Player freezes angles for 1+ ticks after button press
+  * ''DR_WiggleHack'': Almost definitely a strafe hack, checks for IN_LEFT/IN_RIGHT
+  * ''DR_TurningInfraction'': Client turns at impossible speeds
+
+----
+
+=== 4. Gain Calculation Analysis ===
+
+**Overview**
+
+This detection vector focuses on analyzing the efficiency and patterns of player movement, particularly during air strafing. It calculates a player's "gain percentage," which represents the efficiency of their strafing movements in gaining speed and momentum.
+
+**Key Components**
+
+  * **Gain Percentage Calculation**: Calculates a player's gain percentage, representing the efficiency of their strafing movements.
+  * **Yawing Percentage Calculation**: Tracks the percentage of time a player spends actively turning during air strafing.
+  * **Timing Percentage Calculation**: Measures the percentage of time a player spends "timing" their strafes optimally.
+  * **Strafe Count Tracking**: Monitors the number of strafes performed during a series of jumps.
+
+**Detection Logic**
+
+  * Calculates gain, yawing, and timing percentages over a series of jumps (typically 6).
+  * Triggers warnings or bans for abnormally high and consistent gain percentages, especially when combined with suspicious yawing or timing percentages.
+  * Considers factors like wall touches and func_rotating entities to prevent false positives.
+  * Accounts for the first six jumps separately, as they may have different characteristics.
+
+**Detection Reasons**
+  * ''DR_ImpossibleGains'': Gains < 85% are probably strafe hacks
+
+----
+
+=== 5. Additional Detection Methods ===
+
+**Overview**
+
+The plugin incorporates several additional detection methods to complement the main vectors and improve overall cheat detection accuracy.
+
+**Key Components**
+
+  * **Teleport Detection**: Identifies sudden, large changes in player position that could be used to bypass certain checks.
+  * **MOTD Test**: A manual test that can be triggered by admins to check for certain types of strafe hacks.
+  * **Joystick/Controller Detection**: Accounts for players using controllers to prevent false positives in movement analysis.
+  * **ConVar Monitoring**: Tracks changes to relevant client ConVars that could indicate attempts to bypass the anticheat.
+
+**Detection Logic**
+
+  * Monitors for sudden position changes exceeding a threshold.
+  * Allows admins to perform manual tests for additional verification.
+  * Adjusts detection thresholds based on input method (mouse vs. controller).
+  * Logs suspicious ConVar changes and considers them in overall cheat analysis.
+
+**Detection Reasons**
+  * ''DR_FailedManualAngleTest'': Almost definitely strafe hacking (Ban)
+  * ''DR_FailedManualMOTDTest'': Almost definitely strafe hacking (Ban)
+
+----
+
+==== Configuration and Tuning ====
+
+BASH offers several ConVars to customize its behavior and sensitivity. These allow server operators to fine-tune the plugin's performance and adapt it to their specific needs.
+
+=== Core Configuration ConVars ===
+
+  * **bash_banlength**: Sets the ban length for automated bans.
+    * Default: "0" (permanent ban)
+    * Description: Determines the duration of bans issued by the plugin. Use "0" for permanent bans, or specify a time in minutes.
+
+  * **bash_autoban**: Enables or disables automatic banning of detected players.
+    * Default: 1 (enabled)
+    * Values: 0 (disabled) or 1 (enabled)
+    * Description: When enabled, the plugin will automatically ban players who trigger certain detection thresholds.
+
+  * **bash_antinull**: Punishes players for exhibiting a high percentage of null movement stats.
+    * Default: 0 (disabled)
+    * Values: 0 (disabled) or 1 (enabled)
+    * Description: When enabled, players with suspicious null movement patterns may be kicked or banned.
+
+  * **bash_print_null_logs**: Controls whether null movement logs are printed to chat.
+    * Default: 0 (disabled)
+    * Values: 0 (disabled) or 1 (enabled)
+    * Description: Determines if detailed null movement logs should be visible in the game chat. Useful for debugging but can be spammy.
+
+  * **bash_query_rate**: Determines the frequency of querying client ConVars.
+    * Default: 0.2 (seconds)
+    * Range: 0.1 to 2.0 seconds
+    * Description: Sets how often the plugin queries clients for their ConVar values. Lower values increase accuracy but may impact performance.
+
+  * **bash_persistent_data**: Enables or disables saving and reloading strafe stats for players across map changes.
+    * Default: 1 (enabled)
+    * Values: 0 (disabled) or 1 (enabled)
+    * Description: When enabled, player strafe statistics are saved and reloaded between map changes, preventing stats reset through reconnects.
+
+----
+
+=== Additional Configuration Options ===
+
+  * **IDENTICAL_STRAFE_MIN**: Defines the minimum number of identical strafes to trigger a detection.
+    * Default: 20
+    * Description: This value is hardcoded in the plugin and can be adjusted in the source code if needed.
+
+----
+
+=== Admin Commands ===
+
+  * **bash2_stats**: Allows admins to check a player's strafe stats.
+    * Usage: ''!bash2_stats <player>''
+    * Description: Displays a menu with detailed strafe statistics for the specified player.
+
+  * **bash2_admin**: Toggles admin mode for the command user.
+    * Usage: ''!bash2_admin''
+    * Description: When enabled, the admin receives BASH info messages in chat.
+
+  * **bash2_test**: Triggers a test message for webhook functionality.
+    * Usage: ''!bash2_test''
+    * Description: Useful for verifying that external logging or notification systems are working correctly.
+
+----
+
+=== Tuning Recommendations ===
+
+  - Start with default values and observe the plugin's behavior on your server.
+  - If false positives occur, consider increasing detection thresholds like the identical strafe minimum, standard deviation thresholds in the Start and End strafe analysis, or disabling ''bash_autoban''.
+  - For servers with experienced players, you may need to adjust sensitivity to catch more subtle cheating attempts.
+  - Use ''bash_print_null_logs'' temporarily when investigating specific players or issues.
+  - Adjust ''bash_query_rate'' based on your server's performance and the desired level of scrutiny. This is a performance heavy command and can be optimized. Consider autokicking for ''joystick 0''.
+  - When adjusting QueryForCvars manually, make sure you update references in the code that return early if we don't have a cvar check (like ''CheckForIllegalTurning'')
+
+----
+
+==== Log Analysis ====
+
+BASH maintains detailed logs of detected infractions and suspicious activities. These logs are crucial for server administrators to monitor cheating attempts and fine-tune the plugin's settings.
+
+=== Log File Structure ===
+
+  * Log files are named ''ac_YYMMDD.txt'' and stored in the ''logs'' directory.
+  * A new log file is created daily, with the date encoded in the filename.
+  * Old logs are automatically archived into a ''bash.txt'' file to prevent data loss.
+
+----
+
+=== Log Entry Format ===
+
+Each log entry typically includes:
+
+  - Player Name and IP address
+  - Steam Account ID (for persistent data tracking)
+  - Detection Vector (e.g., start strafe, end strafe, key switch)
+  - Relevant Data:
+    * Average tick difference
+    * Standard deviation
+    * Timing percentage
+    * Style used (if Shavit timer is installed)
+    * Gain percentage (for gain calculation detections)
+    * Yawing and timing percentages
+    * Number of identical strafes (if applicable)
+  - Additional context (e.g., ConVar changes, specific cheat indicators). Tip: **Ctrl-F "SUSPECT" and "BAN" for very suspicious entries in massive logs.**
+
+----
+
+=== Log Analysis Tools ===
+
+While not included in the plugin, server operators are encouraged to develop or use external tools to analyze these logs. Such tools could:
+
+  - Identify patterns of suspicious activity across multiple players or sessions.
+  - Generate reports on the frequency and types of detections.
+  - Correlate BASH logs with other server logs for a comprehensive view of player activity.
+
+----
+
+=== Admin Notifications ===
+
+  * Admins with the ''bash2_chat_log'' flag receive real-time notifications in chat when detections occur.
+  * The admin mode (''bash2_admin'' command) allows admins to toggle these notifications on/off.
+
+----
+
+=== Webhook Functionality ===
+
+The plugin includes a ''bash2_test'' command, which is for Discord Webhook integration. This feature, if implemented, would allow real-time alerts to be sent to external services (e.g., Discord, Slack) for immediate admin attention.
+
+The plugin also includes forwards defined in ''include/bash2.inc'' for you to create your own custom notification system.
+
+----
+
+==== Integration with Shavit Timer ====
+
+BASH includes optional integration with the [[https://github.com/shavitush/bhoptimer|Shavit bhop timer]] plugin. This integration enhances BASH's functionality in bhop-specific environments and allows for more nuanced cheat detection.
+
+=== Detection Enhancements ===
+
+When Shavit is detected, BASH can:
+
+  - Consider the current bhop style when logging detections.
+    * Different styles may have different movement characteristics, allowing for style-specific detection thresholds.
+    * Log entries include the style name for context (e.g., "Normal", "Sideways", "W-Only").
+
+  - Adjust its behavior based on Shavit's autobhop settings.
+    * The plugin can modify ground flags to account for autobhop mechanics.
+    * This prevents false positives that might occur due to differences in jump timing between autobhop and manual bhop.
+
+  - Only perform certain checks when a player's timer is running.
+    * This focuses detection efforts on competitive runs, reducing false positives during practice or idle time.
+    * The ''g_bIsBeingTimed'' variable tracks whether a player is currently on a timed run.
+
+----
+
+=== Implementation Details ===
+
+  * The integration is controlled by the ''#define TIMER'' preprocessor directive.
+  * When defined, it includes the Shavit timer headers and enables timer-specific functionality.
+
+----
+
+=== Key Integration Points ===
+
+  - Style Information:
+    <code>
+    int style = Shavit_GetBhopStyle(client);
+    Shavit_GetStyleStrings(style, sStyleName, g_sStyleStrings[style].sStyleName, sizeof(stylestrings_t::sStyleName));
+    </code>
+    This code retrieves the current bhop style for logging and detection purposes.
+
+  - Timer Status Checking:
+    <code>
+    if(Shavit_GetTimerStatus(client) == Timer_Running) {
+        g_bIsBeingTimed[client] = true;
+    }
+    </code>
+    This determines if a player is currently on a timed run.
+
+  - Autobhop Handling:
+    <code>
+    bool autobhop = Shavit_GetStyleSettingBool(style, "autobhop");
+    if(autobhop == false)
+        iValue &= ~FL_ONGROUND;
+    </code>
+    This code adjusts ground flags based on the autobhop setting of the current style.
+
+----
+
+=== Configurating Shavit Integration ===
+
+  * The integration is automatically enabled if the Shavit timer is detected.
+  * Server operators can disable the integration by removing or commenting out the ''#define TIMER'' line in the source code.
+  * No additional ConVars are required for the Shavit integration.
+
+----
+
+=== Benefits of Integration ===
+
+  - Improved accuracy: Style-specific detection reduces false positives.
+  - Competitive focus: Concentrating on timed runs ensures fair play where it matters most.
+  - Comprehensive logging: Style information in logs provides valuable context for admins.
+
+By leveraging the Shavit timer data, BASH can provide more accurate and context-aware cheat detection in bhop-focused environments, enhancing the overall integrity of the server.
+
+----
+
+==== BASH Code Structure Analysis ====
+
+This analysis provides a breakdown of the functions in the BASH anti-strafehack plugin, outlining their responsibilities and interactions.
+
+**Functions**
+
+**Initialization and Setup**
+  * ''OnPluginStart()'': Initializes the plugin, creates ConVars, hooks events, and registers admin commands.
+  * ''OnConfigsExecuted()'': Retrieves ConVar values after configs are executed.
+  * ''OnBanLengthChanged()'': Updates the ban length when the ''bash_banlength'' ConVar changes.
+  * ''OnAllPluginsLoaded()'': Checks for required libraries (dhooks, sendproxy) and initializes them if available.
+  * ''OnLibraryAdded()'': Initializes libraries (dhooks, sendproxy) when they are added.
+  * ''OnLibraryRemoved()'': Updates flags when libraries (dhooks, sendproxy) are removed.
+  * ''Initialize()'': Initializes the DHook for the ''Teleport'' function.
+
+**Logging and Admin Utilities**
+  * ''PrintToAdmins()'': Prints messages to admins with access to the ''bash2_chat_log'' command.
+  * ''AnticheatLog()'': Logs detected infractions to a file and optionally prints them to chat.
+  * ''SaveOldLogs()'': Moves old log files to a separate file for archiving.
+  * ''Bash_Stats()'': Handles the ''bash2_stats'' admin command, displaying a menu for viewing player strafe stats.
+  * ''Bash_AdminMode()'': Handles the ''bash2_admin'' admin command, toggling admin mode for the client.
+  * ''Bash_Test()'': Handles the ''bash2_test'' admin command, triggering a test log message.
+  * ''ShowBashStats()'': Displays a menu for selecting which type of strafe stats to view.
+  * ''BashStats_MainMenu()'': Handles the main menu for viewing strafe stats.
+  * ''PerformMOTDTest()'': Performs a manual MOTD test on a player.
+  * ''PerformAngleTest()'': Performs a manual angle test on a player (not implemented).
+  * ''ShowBashStats_StartStrafes()'': Displays a menu showing start strafe stats for a player.
+  * ''BashStats_StartStrafesMenu()'': Handles the menu for viewing start strafe stats.
+  * ''ShowBashStats_EndStrafes()'': Displays a menu showing end strafe stats for a player.
+  * ''BashStats_EndStrafesMenu()'': Handles the menu for viewing end strafe stats.
+  * ''ShowBashStats_KeySwitches()'': Displays a menu for selecting which type of key switch stats to view.
+  * ''BashStats_KeySwitchesMenu()'': Handles the menu for selecting key switch stats.
+  * ''ShowBashStats_KeySwitches_Move()'': Displays a menu showing movement key switch stats for a player.
+  * ''ShowBashStats_KeySwitches_Keys()'': Displays a menu showing button key switch stats for a player.
+  * ''BashStats_KeySwitchesMenu_Move()'': Handles the menu for viewing movement key switch stats.
+
+**Core Detection Logic**
+  * ''Event_PlayerJump()'': Handles the ''player_jump'' event, calculating and logging gain percentages after a series of jumps.
+  * ''OnClientConnected()'': Initializes player-specific variables when a client connects.
+  * ''OnClientPostAdminCheck()'': Loads persistent data for the client if enabled.
+  * ''OnClientPutInServer()'': Hooks SDKHook_Touch and DHook_Teleport for the client.
+  * ''OnClientDisconnect()'': Saves persistent data for the client if enabled.
+  * ''Hook_GroundFlags()'': Modifies ground flags based on Shavit timer settings.
+  * ''QueryForCvars()'': Queries client ConVars related to mouse settings and sensitivity.
+  * ''OnYawSpeedRetrieved()'': Retrieves and validates the ''cl_yawspeed'' ConVar value.
+  * ''OnYawRetrieved()'': Retrieves and logs changes to the ''m_yaw'' ConVar.
+  * ''OnFilterRetrieved()'': Retrieves and logs changes to the ''m_filter'' ConVar.
+  * ''OnCustomAccelRetrieved()'': Retrieves and logs changes to the ''m_customaccel'' ConVar.
+  * ''OnCustomAccelMaxRetrieved()'': Retrieves and logs changes to the ''m_customaccel_max'' ConVar.
+  * ''OnCustomAccelScaleRetrieved()'': Retrieves and logs changes to the ''m_customaccel_scale'' ConVar.
+  * ''OnCustomAccelExRetrieved()'': Retrieves and logs changes to the ''m_customaccel_exponent'' ConVar.
+  * ''OnRawInputRetrieved()'': Retrieves and logs changes to the ''m_rawinput'' ConVar.
+  * ''OnSensitivityRetrieved()'': Retrieves and logs changes to the ''sensitivity'' ConVar.
+  * ''OnYawSensitivityRetrieved()'': Retrieves and logs changes to the ''joy_yawsensitivity'' ConVar.
+  * ''OnZoomSensitivityRetrieved()'': Retrieves and logs changes to the ''zoom_sensitivity_ratio_mouse'' or ''zoom_sensitivity_ratio'' ConVar.
+  * ''OnJoystickRetrieved()'': Retrieves and logs changes to the ''joystick'' ConVar.
+  * ''Hook_OnTouch()'': Handles the ''SDKHook_Touch'' event, updating flags for wall and rotating entity touches. 
+  * ''OnPlayerRunCmd()'': Handles the ''OnPlayerRunCmd'' event, performing the core detection logic.
+  * ''CheckForIllegalTurning()'': Checks for illegal turning rates based on mouse settings and client variables.
+  * ''CheckForWOnlyHack()'': Checks for potential "W-only" strafe hacking.
+  * ''CheckForStartKey()'': Detects when a player presses a movement key.
+  * ''ClientPressedKey()'': Handles logic when a player presses a key, including recording start strafes and key switches.
+  * ''CheckForTeleport()'': Detects potential teleportation based on sudden changes in player position.
+  * ''CheckForEndKey()'': Detects when a player releases a movement key.
+  * ''ClientReleasedKey()'': Handles logic when a player releases a key, including recording end strafes and key switches.
+  * ''CheckForTurn()'': Detects changes in player turning direction. 
+  * ''ClientTurned()'': Handles logic when a player changes turning direction, including recording start/end strafes and checking for W-only hacks.
+  * ''ClientStoppedTurning()'': Handles logic when a player stops turning, including recording end strafes.
+  * ''RecordStartStrafe()'': Records data for a start strafe event.
+  * ''RecordEndStrafe()'': Records data for an end strafe event.
+  * ''RecordKeySwitch()'': Records data for a key switch event.
+  * ''Timer_NullKick()'': Kicks a player after a delay for potential movement config violations.
+  * ''CheckForIllegalMovement()'': Checks for illegal movement patterns and inconsistencies.
+  * ''UpdateButtons()'': Updates player button states based on current movement velocity.
+  * ''UpdateAngles()'': Calculates angle differences between current and previous ticks.
+  * ''FindDegreeAngleFromVectors()'': Calculates the angle between two vectors in degrees.
+  * ''UpdateGains()'': Calculates and updates player gain percentages and related data.
+  * ''IsInLeftRight()'': Checks if the player is actively turning left or right.
+  * ''GetGainPercent()'': Calculates and returns the player's gain percentage.
+  * ''GetDesiredTurnDir()'': Determines the expected turning direction based on current movement and button presses.
+  * ''GetDesiredButton()'': Determines the expected button press based on current movement and turning direction.
+  * ''GetOppositeButton()'': Returns the opposite button for a given movement button.
+  * ''GetDirection()'': Determines the player's current movement direction based on velocity and view angles.
+  * ''GetTurnDirectionName()'': Returns a string representation of a turning direction.
+  * ''GetMoveDirectionName()'': Returns a string representation of a movement direction.
+  * ''GetClientVelocity()'': Calculates the client's velocity, optionally excluding specific axes (only used when Shavit timer is not installed).
+
+**Helper Functions**
+  * ''StandardDeviation()'': Calculates the standard deviation of an array of integers.
+  * ''GetAverage()'': Calculates the average of an array of integers.
+
+----
+
+==== Data ====
+
+**Key Configuration Constants and Detection Reason Bit Flags**
+<code c++>
+// ----------------------------------------------------------------------------
+//  Configuration 
+// ----------------------------------------------------------------------------
+
+#define BAN_LENGTH "0"              // Default ban length for automated bans
+#define IDENTICAL_STRAFE_MIN 20     // Minimum number of identical strafes to trigger a detection
+
+// ----------------------------------------------------------------------------
+//  Button and Movement Definitions
+// ----------------------------------------------------------------------------
+
+#define Button_Forward 0 
+#define Button_Back    1
+#define Button_Left    2
+#define Button_Right   3
+
+#define BT_Move 0                   // Button type: Movement keys (W, A, S, D)  
+#define BT_Key  1                   // Button type: Other keys (Left, Right)
+
+#define Moving_Forward 0
+#define Moving_Back    1
+#define Moving_Left    2  
+#define Moving_Right   3
+
+#define Turn_Left  0
+#define Turn_Right 1
+
+// ----------------------------------------------------------------------------
+//  Strafe and Key Switch Data Indices
+// ----------------------------------------------------------------------------
+
+// Start/End Strafe Data
+#define StrafeData_Button        0
+#define StrafeData_TurnDirection 1
+#define StrafeData_MoveDirection 2
+#define StrafeData_Difference    3
+#define StrafeData_Tick          4
+#define StrafeData_IsTiming      5
+
+// Key switch data 
+#define KeySwitchData_Button     0
+#define KeySwitchData_Difference 1
+#define KeySwitchData_IsTiming   2
+
+// ----------------------------------------------------------------------------
+//  Detection Reasons 
+// ----------------------------------------------------------------------------
+
+// Each detection reason is represented by a bit in a bit flag.
+// This allows for multiple detection reasons to be flagged simultaneously.
+
+#define DR_StartStrafe_LowDeviation     (1 << 0)  // < 1.0 very likely strafe hacks (Warn admins)
+#define DR_StartStrafe_AlwaysPositive   (1 << 1)  // Might not be strafe hacking but a good indicator of someone trying to bypass anticheat (Warn admins)
+#define DR_EndStrafe_LowDeviation       (1 << 2)  // < 1.0 very likely strafe hacks (Warn admins) 
+#define DR_EndStrafe_AlwaysPositive     (1 << 3)  // Might not be strafe hacking but a good indicator of someone trying to bypass anticheat (Warn admins)
+#define DR_StartStrafeMatchesEndStrafe  (1 << 4)  // A way to catch an angle delay hack (Do nothing)
+#define DR_KeySwitchesTooPerfect        (1 << 5)  // Could be movement config or anti ghosting keyboard (Warn admins)
+#define DR_FailedManualAngleTest        (1 << 6)  // Almost definitely strafe hacking (Ban)
+#define DR_ButtonsAndSideMoveDontMatch  (1 << 7)  // Could be caused by lag but can be made to detect strafe hacks perfectly (Ban/Warn based on severity)
+#define DR_ImpossibleSideMove           (1 << 8)  // Could be +strafe or controller but most likely strafe hack (Warn admins/Stop player movements)
+#define DR_FailedManualMOTDTest         (1 << 9)  // Almost definitely strafe hacking (Ban)
+#define DR_AngleDelay                   (1 << 10) // Player freezes their angles for 1 or more ticks after they press a button until the angle changes again
+#define DR_ImpossibleGains              (1 << 11) // < 85% probably strafe hacks
+#define DR_WiggleHack                   (1 << 12) // Almost definitely strafe hack. Check for IN_LEFT/IN_RIGHT
+#define DR_TurningInfraction            (1 << 13) // Client turns at impossible speeds
+</code>
+
+**Global Variables**
+<code c++>
+// ----------------------------------------------------------------------------
+//  Global Variables
+// ----------------------------------------------------------------------------
+
+// Engine version
+EngineVersion g_Engine;
+
+// Player data arrays
+// These arrays store various data about each player, such as button presses, 
+// movement vectors, angles, and strafe statistics.
+
+int  g_iRealButtons[MAXPLAYERS + 1];                 // Actual buttons pressed by the player
+int  g_iButtons[MAXPLAYERS + 1][2];                  // Processed buttons (movement and keys) 
+int  g_iLastButtons[MAXPLAYERS + 1][2];              // Buttons pressed in the previous tick
+int  g_iLastPressTick[MAXPLAYERS + 1][4][2];         // Tick number of the last button press for each button type
+int  g_iLastPressTick_Recorded[MAXPLAYERS + 1][4][2];       // Recorded tick number of the last button press for strafe analysis  
+int  g_iLastPressTick_Recorded_KS[MAXPLAYERS + 1][4][2];    // Recorded tick number of the last button press for key switch analysis
+int  g_iKeyPressesThisStrafe[MAXPLAYERS + 1][2];            // Number of key presses during the current strafe
+int  g_iLastReleaseTick[MAXPLAYERS + 1][4][2];              // Tick number of the last button release for each button type
+int  g_iLastReleaseTick_Recorded[MAXPLAYERS + 1][4][2];     // Recorded tick number of the last button release for strafe analysis
+int  g_iLastReleaseTick_Recorded_KS[MAXPLAYERS + 1][4][2];  // Recorded tick number of the last button release for key switch analysis
+float g_fLastMove[MAXPLAYERS + 1][3];                // Player's velocity vector in the previous tick  
+int  g_iLastTurnDir[MAXPLAYERS + 1];                 // Direction of the last turn (left or right)
+int  g_iLastTurnTick[MAXPLAYERS + 1];                // Tick number of the last turn
+int  g_iLastTurnTick_Recorded_StartStrafe[MAXPLAYERS + 1];  // Recorded tick number of the last turn for start strafe analysis
+int  g_iLastTurnTick_Recorded_EndStrafe[MAXPLAYERS + 1];    // Recorded tick number of the last turn for end strafe analysis
+int  g_iLastStopTurnTick[MAXPLAYERS + 1];            // Tick number when the player stopped turning  
+bool g_bIsTurning[MAXPLAYERS + 1];                   // Whether the player is currently turning
+int  g_iReleaseTickAtLastEndStrafe[MAXPLAYERS + 1][4];      // Tick number of the last button release at the end of a strafe
+float g_fLastAngles[MAXPLAYERS + 1][3];              // Player's view angles in the previous tick
+int  g_InvalidButtonSidemoveCount[MAXPLAYERS + 1];   // Number of consecutive ticks with invalid button and sidemove combinations
+int  g_iCmdNum[MAXPLAYERS + 1];                      // Number of commands received from the player
+float g_fLastPosition[MAXPLAYERS + 1][3];            // Player's position in the previous tick  
+int  g_iLastTeleportTick[MAXPLAYERS + 1];            // Tick number of the last teleport
+float g_fAngleDifference[MAXPLAYERS + 1][2];         // Difference between current and previous view angles  
+float g_fLastAngleDifference[MAXPLAYERS + 1][2];     // Angle difference in the previous tick
+
+// Gain calculation variables
+// These variables are used to calculate the player's gain percentage,
+// which is a measure of how much speed they are gaining from strafing.
+
+int  g_strafeTick[MAXPLAYERS + 1];                   // Number of ticks since the start of the current strafe
+float g_flRawGain[MAXPLAYERS + 1];                   // Accumulated gain value  
+bool g_bTouchesWall[MAXPLAYERS + 1];                 // Whether the player is currently touching a wall
+int  g_iJump[MAXPLAYERS + 1];                        // Number of consecutive jumps
+int  g_iTicksOnGround[MAXPLAYERS + 1];               // Number of consecutive ticks the player has been on the ground
+float g_iYawSpeed[MAXPLAYERS + 1];                   // Player's yaw speed (from cl_yawspeed) 
+int  g_iYawTickCount[MAXPLAYERS + 1];                // Number of ticks the player has been yawing
+int  g_iTimingTickCount[MAXPLAYERS + 1];             // Number of ticks the player has been timing their strafes
+int  g_iStrafesDone[MAXPLAYERS + 1];                 // Number of strafes performed 
+bool g_bFirstSixJumps[MAXPLAYERS + 1];               // Whether the player is in their first six jumps
+
+#define BHOP_TIME 15             // Number of ticks on ground before resetting jump count
+
+// Optimizer detection variable 
+bool g_bTouchesFuncRotating[MAXPLAYERS + 1];         // Whether the player is touching a func_rotating entity, used to prevent false positives
+
+// Mouse cvars
+// These variables store the values of various mouse-related convars,
+// which are used to detect illegal turning rates.
+
+// Mouse cvars
+float g_mYaw[MAXPLAYERS + 1];                int g_mYawChangedCount[MAXPLAYERS + 1];             int g_mYawCheckedCount[MAXPLAYERS + 1];
+bool  g_mFilter[MAXPLAYERS + 1];              int g_mFilterChangedCount[MAXPLAYERS + 1];          int g_mFilterCheckedCount[MAXPLAYERS + 1];  
+int   g_mCustomAccel[MAXPLAYERS + 1];         int g_mCustomAccelChangedCount[MAXPLAYERS + 1];     int g_mCustomAccelCheckedCount[MAXPLAYERS + 1];
+float g_mCustomAccelMax[MAXPLAYERS + 1];      int g_mCustomAccelMaxChangedCount[MAXPLAYERS + 1];  int g_mCustomAccelMaxCheckedCount[MAXPLAYERS + 1];
+float g_mCustomAccelScale[MAXPLAYERS + 1];    int g_mCustomAccelScaleChangedCount[MAXPLAYERS + 1];int g_mCustomAccelScaleCheckedCount[MAXPLAYERS + 1]; 
+float g_mCustomAccelExponent[MAXPLAYERS + 1]; int g_mCustomAccelExponentChangedCount[MAXPLAYERS + 1]; int g_mCustomAccelExponentCheckedCount[MAXPLAYERS + 1];
+bool  g_mRawInput[MAXPLAYERS + 1];            int g_mRawInputChangedCount[MAXPLAYERS + 1];        int g_mRawInputCheckedCount[MAXPLAYERS + 1];
+float g_Sensitivity[MAXPLAYERS + 1];          int g_SensitivityChangedCount[MAXPLAYERS + 1];      int g_SensitivityCheckedCount[MAXPLAYERS + 1];
+float g_JoySensitivity[MAXPLAYERS + 1];    int g_JoySensitivityChangedCount[MAXPLAYERS + 1];   int g_JoySensitivityCheckedCount[MAXPLAYERS + 1];  
+float g_ZoomSensitivity[MAXPLAYERS + 1];      int g_ZoomSensitivityChangedCount[MAXPLAYERS + 1];  int g_ZoomSensitivityCheckedCount[MAXPLAYERS + 1];
+bool  g_JoyStick[MAXPLAYERS + 1];             int g_JoyStickChangedCount[MAXPLAYERS + 1];         int g_JoyStickCheckedCount[MAXPLAYERS + 1]; 
+
+// Recorded data arrays
+// These arrays store historical data about strafes and key switches,
+// which is used to analyze patterns and detect anomalies.
+
+#define MAX_FRAMES 50                           // Maximum number of frames to record for strafe analysis 
+#define MAX_FRAMES_KEYSWITCH 50                 // Maximum number of frames to record for key switch analysis
+
+int  g_iStartStrafe_CurrentFrame[MAXPLAYERS + 1];                  // Current frame index for start strafe recording  
+any  g_iStartStrafe_Stats[MAXPLAYERS + 1][7][MAX_FRAMES];           // Start strafe data
+int  g_iStartStrafe_LastRecordedTick[MAXPLAYERS + 1];              // Tick number of the last recorded start strafe
+int  g_iStartStrafe_LastTickDifference[MAXPLAYERS + 1];            // Difference between the last two recorded start strafes  
+bool g_bStartStrafe_IsRecorded[MAXPLAYERS + 1][MAX_FRAMES];         // Whether a start strafe has been recorded for each frame
+int  g_iStartStrafe_IdenticalCount[MAXPLAYERS + 1];                // Number of consecutive identical start strafes
+int  g_iEndStrafe_CurrentFrame[MAXPLAYERS + 1];                    // Current frame index for end strafe recording
+any  g_iEndStrafe_Stats[MAXPLAYERS + 1][7][MAX_FRAMES];             // End strafe data  
+int  g_iEndStrafe_LastRecordedTick[MAXPLAYERS + 1];                // Tick number of the last recorded end strafe
+int  g_iEndStrafe_LastTickDifference[MAXPLAYERS + 1];              // Difference between the last two recorded end strafes
+bool g_bEndStrafe_IsRecorded[MAXPLAYERS + 1][MAX_FRAMES];           // Whether an end strafe has been recorded for each frame  
+int  g_iEndStrafe_IdenticalCount[MAXPLAYERS + 1];                  // Number of consecutive identical end strafes
+int  g_iKeySwitch_CurrentFrame[MAXPLAYERS + 1][2];                 // Current frame index for key switch recording for each button type
+any  g_iKeySwitch_Stats[MAXPLAYERS + 1][3][2][MAX_FRAMES_KEYSWITCH]; // Key switch data
+bool g_bKeySwitch_IsRecorded[MAXPLAYERS + 1][2][MAX_FRAMES_KEYSWITCH]; // Whether a key switch has been recorded for each frame and button type
+int  g_iKeySwitch_LastRecordedTick[MAXPLAYERS + 1][2];             // Tick number of the last recorded key switch for each button type
+bool g_iIllegalTurn[MAXPLAYERS + 1][MAX_FRAMES];                    // Whether an illegal turn has been detected for each frame  
+int  g_iIllegalTurn_CurrentFrame[MAXPLAYERS + 1];                  // Current frame index for illegal turn recording
+bool g_iIllegalTurn_IsTiming[MAXPLAYERS + 1][MAX_FRAMES];           // Whether the illegal turn was performed during a timing strafe
+int  g_iLastIllegalReason[MAXPLAYERS + 1];                         // Reason for the last illegal movement detection
+int  g_iIllegalSidemoveCount[MAXPLAYERS + 1];                      // Number of consecutive ticks with illegal sidemove values
+int  g_iLastIllegalSidemoveCount[MAXPLAYERS + 1];                  // Illegal sidemove count in the previous tick 
+int  g_iLastInvalidButtonCount[MAXPLAYERS + 1];                    // Invalid button count in the previous tick
+int  g_iYawChangeCount[MAXPLAYERS + 1];                            // Number of yaw changes during illegal sidemove
+
+// MOTD Test  
+bool  g_bCheckedYet[MAXPLAYERS + 1];  
+float g_MOTDTestAngles[MAXPLAYERS + 1][3];
+bool  g_bMOTDTest[MAXPLAYERS + 1];
+
+// Persistent data
+// This struct is used to store persistent data about players, 
+// such as strafe statistics, which can be saved and loaded between maps.
+
+// Note: This struct is defined to reduce memory usage by flattening the multi-dimensional arrays.
+// This is necessary because SourceMod has a limited amount of memory available for plugins.
+
+enum struct fuck_sourcemod
+{
+	int accountid;                         // Steam account ID
+
+	// Button and movement data
+	int  g_iRealButtons;                    
+	int  g_iButtons[2];                     
+	int  g_iLastButtons[2];                 
+	int  g_iLastPressTick_0[2];             
+	int  g_iLastPressTick_1[2];             
+	int  g_iLastPressTick_2[2];             
+	int  g_iLastPressTick_3[2];             
+	int  g_iLastPressTick_Recorded_0[2];    
+	int  g_iLastPressTick_Recorded_1[2];    
+	int  g_iLastPressTick_Recorded_2[2];    
+	int  g_iLastPressTick_Recorded_3[2];    
+	int  g_iLastPressTick_Recorded_KS_0[2]; 
+	int  g_iLastPressTick_Recorded_KS_1[2]; 
+	int  g_iLastPressTick_Recorded_KS_2[2]; 
+	int  g_iLastPressTick_Recorded_KS_3[2]; 
+	int  g_iKeyPressesThisStrafe[2];        
+	int  g_iLastReleaseTick_0[2];           
+	int  g_iLastReleaseTick_1[2];           
+	int  g_iLastReleaseTick_2[2];           
+	int  g_iLastReleaseTick_3[2];           
+	int  g_iLastReleaseTick_Recorded_0[2];  
+	int  g_iLastReleaseTick_Recorded_1[2];  
+	int  g_iLastReleaseTick_Recorded_2[2];  
+	int  g_iLastReleaseTick_Recorded_3[2];  
+	int  g_iLastReleaseTick_Recorded_KS_0[2];
+	int  g_iLastReleaseTick_Recorded_KS_1[2];
+	int  g_iLastReleaseTick_Recorded_KS_2[2];
+	int  g_iLastReleaseTick_Recorded_KS_3[2];
+	float g_fLastMove[3];                    
+	int  g_iLastTurnDir;                     
+	int  g_iLastTurnTick;                    
+	int  g_iLastTurnTick_Recorded_StartStrafe;
+	int  g_iLastTurnTick_Recorded_EndStrafe; 
+	int  g_iLastStopTurnTick;                
+	bool g_bIsTurning;                       
+	int  g_iReleaseTickAtLastEndStrafe[4];   
+	float g_fLastAngles[3];                  
+	int  g_InvalidButtonSidemoveCount;       
+	int  g_iCmdNum;                          
+	float g_fLastPosition[3];                
+	int  g_iLastTeleportTick;                
+	float g_fAngleDifference[2];             
+	float g_fLastAngleDifference[2];         
+
+	// Gain calculation data
+	int  g_strafeTick;                      
+	float g_flRawGain;                      
+	bool g_bTouchesWall;                    
+	int  g_iJump;                           
+	int  g_iTicksOnGround;                  
+	float g_iYawSpeed;                      
+	int  g_iYawTickCount;                   
+	int  g_iTimingTickCount;                
+	int  g_iStrafesDone;                    
+	bool g_bFirstSixJumps;                  
+
+	// Strafe analysis data
+	int  g_iStartStrafe_CurrentFrame;        
+	any  g_iStartStrafe_Stats_0[MAX_FRAMES]; 
+	any  g_iStartStrafe_Stats_1[MAX_FRAMES]; 
+	any  g_iStartStrafe_Stats_2[MAX_FRAMES]; 
+	any  g_iStartStrafe_Stats_3[MAX_FRAMES]; 
+	any  g_iStartStrafe_Stats_4[MAX_FRAMES]; 
+	any  g_iStartStrafe_Stats_5[MAX_FRAMES]; 
+	any  g_iStartStrafe_Stats_6[MAX_FRAMES]; 
+	int  g_iStartStrafe_LastRecordedTick;    
+	int  g_iStartStrafe_LastTickDifference; 
+	bool g_bStartStrafe_IsRecorded[MAX_FRAMES];
+	int  g_iStartStrafe_IdenticalCount;     
+	int  g_iEndStrafe_CurrentFrame;          
+	any  g_iEndStrafe_Stats_0[MAX_FRAMES];   
+	any  g_iEndStrafe_Stats_1[MAX_FRAMES];   
+	any  g_iEndStrafe_Stats_2[MAX_FRAMES];   
+	any  g_iEndStrafe_Stats_3[MAX_FRAMES];   
+	any  g_iEndStrafe_Stats_4[MAX_FRAMES];   
+	any  g_iEndStrafe_Stats_5[MAX_FRAMES];   
+	any  g_iEndStrafe_Stats_6[MAX_FRAMES];   
+	int  g_iEndStrafe_LastRecordedTick;     
+	int  g_iEndStrafe_LastTickDifference;   
+	bool g_bEndStrafe_IsRecorded[MAX_FRAMES];
+	int  g_iEndStrafe_IdenticalCount;       
+
+	// Key switch analysis data  
+	int  g_iKeySwitch_CurrentFrame[2];       
+	any  g_iKeySwitch_Stats_0_0[MAX_FRAMES_KEYSWITCH];
+	any  g_iKeySwitch_Stats_0_1[MAX_FRAMES_KEYSWITCH];
+	any  g_iKeySwitch_Stats_1_0[MAX_FRAMES_KEYSWITCH];
+	any  g_iKeySwitch_Stats_1_1[MAX_FRAMES_KEYSWITCH];
+	any  g_iKeySwitch_Stats_2_0[MAX_FRAMES_KEYSWITCH];
+	any  g_iKeySwitch_Stats_2_1[MAX_FRAMES_KEYSWITCH];
+	bool g_bKeySwitch_IsRecorded_0[MAX_FRAMES_KEYSWITCH]; 
+	bool g_bKeySwitch_IsRecorded_1[MAX_FRAMES_KEYSWITCH]; 
+	int  g_iKeySwitch_LastRecordedTick[2];  
+
+	// Illegal movement detection data
+	bool g_iIllegalTurn[MAX_FRAMES];        
+	int  g_iIllegalTurn_CurrentFrame;       
+	bool g_iIllegalTurn_IsTiming[MAX_FRAMES];
+	int  g_iLastIllegalReason;              
+	int  g_iIllegalSidemoveCount;           
+	int  g_iLastIllegalSidemoveCount;       
+	int  g_iLastInvalidButtonCount;         
+	int  g_iYawChangeCount;                 
+}
+
+// Late load flag
+bool g_bLateLoad;
+
+// DHook handles  
+Handle g_hTeleport;                        // Handle for the Teleport DHook, used to prevent false positives
+
+// DHook loaded flag
+bool  g_bDhooksLoaded;
+
+// Forward handles
+Handle g_fwdOnDetection;                   // Forward for cheat detection events  
+Handle g_fwdOnClientBanned;                // Forward for client ban events
+
+// ConVar handles
+ConVar g_hBanLength;                       // Ban length for automated bans
+char  g_sBanLength[32];                    // String representation of the ban length  
+ConVar g_hAntiNull;                     // Whether to punish for null movement stats
+ConVar g_hPrintNullLogs;                // Whether to print null movement logs to chat
+ConVar g_hAutoban;                         // Whether to automatically ban detected players
+ConVar g_hQueryRate;                       // How often to query convars from the client
+ConVar g_hPersistentData;                  // Whether to save and reload strafe stats  
+
+// Admin mode flag
+bool g_bAdminMode[MAXPLAYERS + 1];  
+
+// Log file path
+char g_aclogfile[PLATFORM_MAX_PATH];
+
+// Player IP addresses  
+char g_sPlayerIp[MAXPLAYERS + 1][16];
+
+// Persistent data array
+ArrayList g_aPersistentData = null;  
+
+// Target player for admin commands
+int  g_iTarget[MAXPLAYERS + 1];
+</code>
+
+----
+
+==== Conclusion ====
+
+BASH is a powerful tool for combating strafe hacking in Counter-Strike servers. By understanding its detection vectors, code logic, and configuration options, server owners can effectively utilize the plugin to maintain a fair and competitive gaming environment. Regular review of logs, adjustment of settings, and staying informed about emerging cheating techniques will ensure the plugin's continued effectiveness.
+
