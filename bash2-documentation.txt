@@ -1,5 +1,3 @@
-https://rampsliders.wiki/doku.php?id=plugins:bash2
-
 ==== Overview ====
 
 BASH (Blacky's Anti-Strafehack) is a SourceMod plugin designed to detect and punish strafe hacking in Counter-Strike: Source and Counter-Strike: Global Offensive servers. This documentation provides a comprehensive overview of the plugin's detection vectors, code logic, and configuration options, enabling server owners to understand, tune, and effectively utilize the plugin to enforce fair play.
@@ -9,6 +7,14 @@ BASH (Blacky's Anti-Strafehack) is a SourceMod plugin designed to detect and pun
 ==== Introduction ====
 
 Strafe hacking is a cheating technique that allows players to gain unfair speed and movement advantages by exploiting the game's movement mechanics. BASH aims to identify and counter these exploits by analyzing player movement patterns, button presses, and timing discrepancies.
+
+There are multiple forms of strafe cheating that BASH2 detects, but the most common forms are external input simulation auto strafing. This can involve using Python scripts or external turn binds to synchronise and simulate key presses with yaw changes, indirectly. BASH2 aims to detect this.
+
+BASH2 also aims to detect direct internal CUserCmd manipulation. 
+
+The client receives a CUserCmd from the user each tick, but the client is actually able to modify this directly at the CreateMove stage. By aligning perfect inputs by direct memory manipulation, it becomes a much more powerful and also potentially much harder to detect autostrafe tool from a server-side perspective.
+
+In addition to this, BASH2 performs various other checks, which are detailed below, and targets more obscure forms of strafe cheating like Movement Recorders, Null Binds and Strafe Optimizers.
 
 ----
 
@@ -35,13 +41,14 @@ This detection vector focuses on identifying abnormal patterns in player movemen
   * Triggers warnings or bans based on low standard deviations (indicating highly consistent timing) or high numbers of identical strafes.
   * Detects patterns such as too many identical strafes in a row (configurable via ''IDENTICAL_STRAFE_MIN'').
   * Considers whether the player is being timed by the Shavit timer plugin (if integrated) for more accurate detection.
+  * Consider changing the standard deviation thresholds for higher level players.
 
 **Detection Reasons**
-  * ''DR_StartStrafe_LowDeviation'': Very likely strafe hacks when < 1.0 (Warns admins)
-  * ''DR_StartStrafe_AlwaysPositive'': Potential indicator of anticheat bypass attempts (Warns admins)
-  * ''DR_EndStrafe_LowDeviation'': Very likely strafe hacks when < 1.0 (Warns admins)
-  * ''DR_EndStrafe_AlwaysPositive'': Potential indicator of anticheat bypass attempts (Warns admins)
-  * ''DR_StartStrafeMatchesEndStrafe'': Potential angle delay hack (Logged for analysis)
+  * ''DR_StartStrafe_LowDeviation'': Very likely strafe hacks when < 0.8 (Warns admins), almost certain strafe hacks when < 0.4 (bans). **Note:** Can be false positive.
+  * ''DR_StartStrafe_AlwaysPositive'': Inhuman timing, suggesting tick-aligned input.
+  * ''DR_EndStrafe_LowDeviation'': Very likely strafe hacks when < 0.8 (Warns admins), almost certain strafe hacks when < 0.4 (bans). **Note:** Can be false positive.
+  * ''DR_EndStrafe_AlwaysPositive'': Inhuman timing, suggesting tick-aligned input.
+  * ''DR_StartStrafeMatchesEndStrafe'': Inhuman timing, suggesting tick-aligned input.
 
 ----
 
@@ -61,8 +68,9 @@ This detection vector focuses on identifying abnormal patterns in how players sw
 
   * Analyzes the last ''MAX_FRAMES_KEYSWITCH'' (default: 50) key switches for both movement keys and other buttons.
   * Calculates the mean, standard deviation, and percentage of positive and null switch times.
-  * Triggers warnings or kicks based on abnormally consistent switch times (low standard deviation) or high percentages of null switches.
+  * Triggers warnings or kicks based on abnormally consistent switch times (low standard deviation <= 0.25) or high percentages of null switches (>= 0.95).
   * Considers whether the player is being timed by the Shavit timer plugin (if integrated) for more accurate detection.
+  * This detection will likely be triggered often by good players, however, be careful modifying this function without a deep understanding of where this data is needed further in execution.
 
 **Detection Reasons**
   * ''DR_KeySwitchesTooPerfect'': Could indicate use of a movement config or anti-ghosting keyboard (Warns admins)
@@ -77,25 +85,25 @@ This detection vector focuses on identifying abnormal turning rates, movement in
 
 **Key Components**
 
-  * **Illegal Yaw Value Detection**: Analyzes player turning rates in relation to their mouse settings and other relevant client variables, identifying turning speeds that exceed legitimate limits.
-  * **Invalid Button/Sidemove Combination Detection**: Checks for inconsistencies between pressed movement keys and actual sidemove velocity, detecting potential strafe hacking or movement manipulation.
-  * **Impossible Sidemove Value Detection**: Identifies sidemove velocities that are impossible to achieve legitimately, indicating potential cheating or exploits.
-  * **Angle Snap Detection**: Detects sudden and significant angle changes occurring within a single tick, which can suggest the use of aimbots or other cheats.
+  * **Illegal Yaw Value Detection**: Analyzes player turning rates in relation to their mouse settings and other relevant client variables, identifying turning speeds that exceed legitimate limits calculated from queried cvars.
+  * **Invalid Button/Sidemove Combination Detection**: Checks for inconsistencies between pressed movement keys and actual movement, detecting CreateMove manipulation.
+  * **Impossible Sidemove Value Detection**: Identifies sidemove/forwardmove inputs that are impossible to achieve legitimately (not a multiple of 6.25 between positive or negative maximum).
+  * **Angle Snap Detection**: Detects sudden and significant angle changes occurring within a single tick, which can suggest the use of silent strafers or other cheats like W-only hacks.
   * **W-only Hack Detection**: Identifies patterns consistent with "W-only" strafe hacking techniques.
 
 **Detection Logic**
 
   * Performs checks every 100 ticks for illegal yaw values.
-  * Continuously monitors for invalid button and sidemove combinations.
-  * Analyzes angle changes for potential "angle snap" or "silent aim" cheats.
-  * Considers various mouse settings (m_yaw, m_customaccel, sensitivity) and game-specific variables (cl_yawspeed).
-  * Accounts for potential false positives from legitimate sources like func_rotating entities or teleportation.
+  * Continuously monitors for invalid button and sidemove/forwardmove combinations.
+  * Analyzes angle changes for potential "angle snap" or "silent strafe" cheats.
+  * Considers various mouse settings (m_yaw, m_customaccel, m_filter, m_rawinput, sensitivity) and game-specific variables (cl_yawspeed).
+  * Accounts for potential false positives from legitimate sources like func_rotating entities, teleportation, +strafe, +klook or joystick.
 
 **Detection Reasons**
-  * ''DR_ButtonsAndSideMoveDontMatch'': Inconsistencies between buttons and movement (Ban/Warn based on severity)
-  * ''DR_ImpossibleSideMove'': Could be +strafe or controller, but likely strafe hack (Warn admins/Stop player movements)
-  * ''DR_AngleDelay'': Player freezes angles for 1+ ticks after button press
-  * ''DR_WiggleHack'': Almost definitely a strafe hack, checks for IN_LEFT/IN_RIGHT
+  * ''DR_ButtonsAndSideMoveDontMatch'': Inconsistencies between buttons and movement (Ban/Warn based on severity), could be caused by lag.
+  * ''DR_ImpossibleSideMove'': Could be +strafe or controller, but likely strafe hack (Warn admins/Stop player movements).
+  * ''DR_AngleDelay'': Player freezes angles for 1+ ticks after button press. Could be an indication of an attempt to bypass anticheat.
+  * ''DR_WiggleHack'': Almost definitely a strafe hack, checks for IN_LEFT/IN_RIGHT with illegal yaw results.
   * ''DR_TurningInfraction'': Client turns at impossible speeds
 
 ----
@@ -308,32 +316,7 @@ When Shavit is detected, BASH can:
 
 ----
 
-=== Key Integration Points ===
 
-  - Style Information:
-    <code>
-    int style = Shavit_GetBhopStyle(client);
-    Shavit_GetStyleStrings(style, sStyleName, g_sStyleStrings[style].sStyleName, sizeof(stylestrings_t::sStyleName));
-    </code>
-    This code retrieves the current bhop style for logging and detection purposes.
-
-  - Timer Status Checking:
-    <code>
-    if(Shavit_GetTimerStatus(client) == Timer_Running) {
-        g_bIsBeingTimed[client] = true;
-    }
-    </code>
-    This determines if a player is currently on a timed run.
-
-  - Autobhop Handling:
-    <code>
-    bool autobhop = Shavit_GetStyleSettingBool(style, "autobhop");
-    if(autobhop == false)
-        iValue &= ~FL_ONGROUND;
-    </code>
-    This code adjusts ground flags based on the autobhop setting of the current style.
-
-----
 
 === Configurating Shavit Integration ===
 
@@ -449,7 +432,7 @@ This analysis provides a breakdown of the functions in the BASH anti-strafehack 
 ==== Data ====
 
 **Key Configuration Constants and Detection Reason Bit Flags**
-<code c++>
+<code Pawn>
 // ----------------------------------------------------------------------------
 //  Configuration 
 // ----------------------------------------------------------------------------
@@ -518,7 +501,7 @@ This analysis provides a breakdown of the functions in the BASH anti-strafehack 
 </code>
 
 **Global Variables**
-<code c++>
+<code pawn>
 // ----------------------------------------------------------------------------
 //  Global Variables
 // ----------------------------------------------------------------------------
