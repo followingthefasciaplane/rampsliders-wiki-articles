@@ -40,18 +40,22 @@ This guide is a work in progress and not feature-complete, as the porting proces
   * Do this after you have prepared all of your assets.
   * **Hammer++** might attempt to fix the errors otherwise.
   * Make sure your prepared assets are located inside the root directory of your game that **Hammer++** is installed in.
+  * We do not need to extract map assets here, since **VIDE** will do it better.
 
 2. **[[https://ficool2.github.io/HammerPlusPlus-Website/index.html|Hammer++]]** to edit your map. 
   * Loading a decompiled, incompatible map inside **Hammer** can mangle vertex alignments, and will most likely just crash after corrupting your VMF data.
   * Loading the same map in **Hammer++** will automatically handle errors and fix most issues, and maintain precise VMF data.
   * The **Check map for problems** feature inside **Hammer++** will identify and report issues that don't get fixed automatically.
   * **Hammer++** contains **Propper++** which can be used for various prop and modelling purposes.
+  * We do not need to recompile our map here, as **CompilePalX** will do it better.
 
 3. **[[https://github.com/ruarai/CompilePal|CompilePalX]]** to recompile your map.
+  * Load the saved VMF from **Hammer++** here.
   * Select the **Publish (Both)** setting with all boxes ticked except for ''Nav'' when compiling.
-  * Ensure that your Steam is open, and your assets are available in your root game directory
+  * Ensure that your Steam is open, and your assets are available in your root game directory.
 
 4. **[[https://developer.valvesoftware.com/wiki/VIDE|VIDE]]** for asset related information and extraction.
+  * We do not need to decompile our map here, since **BSPEntSpy Enhanced** will do it better.
   * See the **Textures and Assets** section below.
 
 5. **[[https://developer.valvesoftware.com/wiki/VTFVer|VTFVer]]** or **[[https://github.com/Sky-rym/VTFEdit-Reloaded|VTFEdit Reloaded]]** for texture editing and conversion.
@@ -108,6 +112,8 @@ If any textures or content is missing or corrupted in the download above, you wi
     * eg. ''C:\...\Steam\steamapps\common\Counter-Strike Source\cstrike''
   - Select **Scan** once again and wait for the scan to complete.
   - All of the items listed in **Red** are missing and you need to find them.
+  - Once you have found, converted, and added the missing items to your game directory, scan again.
+  - If there are no more textures in **Red**, and the old **Red** textures are now **Yellow**, then you can decompile your map and begin editing it in **Hammer++**.
 
 
 **Notes:**  
@@ -115,13 +121,14 @@ If any textures or content is missing or corrupted in the download above, you wi
   * These are ''.mdl'', ''.phy'', ''.vvd'', and ''.vtx'' files for older versions, like ''dx80'' or ''dx70''.
   * Ensure that they are superceded by an existing ''dx90'' version of the same model.
   * Make sure to place the assets exactly where **VIDE** is expecting to find them, if you are not decompiling the models.
+  * You do not need to repack these files into the map, since **CompilePalX** will do it better.
 
 ----
 
 === Fast VTF Conversion ===
 
   - Make a backup of your ''.vtf'' files and the ''.bsp'' for your map.
-  - Download **[[https://developer.valvesoftware.com/wiki/VTFVer|VTFVer]]** if you haven't alredy.
+  - Download **[[https://developer.valvesoftware.com/wiki/VTFVer|VTFVer]]** if you haven't already.
   - Run **VTFVer** as **Administrator**.
   - Select the directory containing your ''.vtf'' files.
   - Enable **Ignore Errors** if you have a lot of files, trust me.
@@ -166,7 +173,7 @@ If any textures or content is missing or corrupted in the download above, you wi
   - **Hammer++** includes **Propper++** which can handle smaller modelling tasks without the need for recompilation.
   - For cases where you need to recompile a model, download **[[https://github.com/ZeqMacaw/Crowbar|Crowbar]]** if you haven't already.
   - Use **Crowbar** to batch decompile the models in a folder.
-  - Open the decompiled ''.qc'' files and fix the incompatible model properties.
+  - Open the decompiled ''.qc'' files in **Notepad++** or **VSCode** and fix the incompatible model properties.
   - Use **Crowbar** to recompile your models after you have made the necessary changes to the ''.qc'' file.
 
 **Notes:**
@@ -335,59 +342,121 @@ This list contains entities present in CS:GO that are not supported at all in CS
 This list contains entities that are supported in CS:S, but contain keyvalues in CS:GO that are not supported in CS:S. 
 
 1. ''info_player_counterterrorist'' and ''info_player_terrorist''
-  * Remove: ''priority'', ''enabled''
-  * Remove inputs: ''SetEnabled'', ''SetDisabled'', ''ToggleEnabled''
+  * Remove: 
+    * ''priority'' 
+    * ''enabled''
+  * Remove inputs: 
+    * ''SetEnabled''
+    * ''SetDisabled''
+    * ''ToggleEnabled''
 
 2. ''hostage_entity''
-  * Remove: ''HostageSpawnRandomFactor'', ''HostageSpawnExclusionGroup1-25''
-  * Remove outputs: ''OnHostageBeginGrab'', ''OnFirstPickedUp'', ''OnDroppedNotRescued'', ''OnRescued''
+  * Remove: 
+    * ''HostageSpawnRandomFactor''
+    * ''HostageSpawnExclusionGroup1-25''
+  * Remove outputs: 
+    * ''OnHostageBeginGrab'' 
+    * ''OnFirstPickedUp'' 
+    * ''OnDroppedNotRescued'' 
+    * ''OnRescued''
 
 3. ''info_map_parameters''
-  * Remove: ''petpopulation'', ''usenormalspawnsfordm'', ''disableautogenerateddmspawns'', ''botmaxvisiondistance'', ''fadeplayervisibilityfarz''
+  * Remove: 
+    * ''petpopulation'' 
+    * ''usenormalspawnsfordm'' 
+    * ''disableautogenerateddmspawns'' 
+    * ''botmaxvisiondistance'' 
+    * ''fadeplayervisibilityfarz''
 
 4. ''func_buyzone''
-  * Remove inputs: ''SetEnabled'', ''SetDisabled'', ''SetTeam_TerroristOnly'', ''SetTeam_CTOnly'', ''SetTeam_AllTeams'', ''SetTeam_None''
+  * Remove inputs: 
+    * ''SetEnabled'' 
+    * ''SetDisabled'' 
+    * ''SetTeam_TerroristOnly'' 
+    * ''SetTeam_CTOnly'' 
+    * ''SetTeam_AllTeams'' 
+    * ''SetTeam_None''
   
 5. ''func_bomb_target''
-  * Remove: ''heistbomb'' (boolean), ''bomb_mount_target'' (string)
+  * Remove: 
+    * ''heistbomb'' (boolean) 
+    * ''bomb_mount_target'' (string)
   
 6. Weapons (all ''weapon_'' entities)
-  * Remove: ''CanBePickedUp''
-  * Remove inputs: ''SetReserveAmmoAmount'', ''SetAmmoAmount'', ''ToggleCanBePickedUp''
+  * Remove: 
+    * ''CanBePickedUp''
+  * Remove inputs: 
+    * ''SetReserveAmmoAmount'' 
+    * ''SetAmmoAmount'' 
+    * ''ToggleCanBePickedUp''
   
 7. ''filter_activator_team''
-  * Adjust: ''filterteam'' choices (remove -1: "None" and 0: "All Teams")
+  * Adjust: 
+    * ''filterteam'' choices 
+      * Remove ''-1: "None"'' and ''0: "All Teams"''
 
 8. ''game_text''
-  * Remove: ''color2'', ''effect'', ''fadein'', ''fadeout'', ''fxtime'', ''holdtime'', ''x'', ''y'', ''channel''
+  * Remove: 
+    * ''color2'' 
+    * ''effect'' 
+    * ''fadein'' 
+    * ''fadeout'' 
+    * ''fxtime'' 
+    * ''holdtime'' 
+    * ''x'' 
+    * ''y'' 
+    * ''channel''
 
 9. ''env_sprite''
-  * Remove: ''GlowProxySize'', ''HDRColorScale''
+  * Remove: 
+    * ''GlowProxySize'' 
+    * ''HDRColorScale''
 
 10. ''light_dynamic''
-  * Remove: ''style'', ''pattern'', ''TextureFrameRate''
+  * Remove: 
+    * ''style'' 
+    * ''pattern'' 
+    * ''TextureFrameRate''
 
 11. ''prop_physics''
-  * Remove: ''physdamagescale'', ''inertiaScale'', ''massScale'', ''overridescript''
+  * Remove: 
+    * ''physdamagescale'' 
+    * ''inertiaScale'' 
+    * ''massScale'' 
+    * ''overridescript''
   
 12. ''trigger_multiple''
-  * Remove: ''filtername'', ''StartDisabled''
+  * Remove: 
+    * ''filtername'' 
+    * ''StartDisabled''
   
 13. ''func_breakable''
-  * Remove: ''minhealthdmg'', ''physdamagescale''
+  * Remove: 
+    * ''minhealthdmg'' 
+    * ''physdamagescale''
   
 14. ''info_particle_system''
-  * Remove: ''cpoint1'', ''cpoint2'', ''cpoint3'', ''cpoint4'', ''cpoint5'', ''cpoint6'', ''cpoint7''
+  * Remove: 
+    * ''cpoint1'' 
+    * ''cpoint2'' 
+    * ''cpoint3'' 
+    * ''cpoint4'' 
+    * ''cpoint5'' 
+    * ''cpoint6'' 
+    * ''cpoint7''
 
 15. ''env_soundscape''
-  * Remove: ''radius'', ''soundpositionoverride''
+  * Remove:
+    * ''radius'' 
+    * ''soundpositionoverride''
   
 16. ''point_template''
-  * Remove: ''PreserveEntity''
+  * Remove: 
+    * ''PreserveEntity''
 
 **Notes:**
   * This list may be incorrect or incomplete. 
-  * For a more thorough analysis, review the FGD files included in the CSGO content download provided in the asset library above.
+  * For a more thorough analysis, review the FGD files included in the CS:GO content download provided in the asset library above, or in my repository listed in the resources section of this article.
   * You will need to update the skybox to one supported by **[[https://developer.valvesoftware.com/wiki/Counter-Strike_Source_Sky_List|CS:S]]** or use a custom skybox.
 
 ----
