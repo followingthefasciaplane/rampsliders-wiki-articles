@@ -1,0 +1,419 @@
+// https://rampsliders.wiki/doku.php?id=mapping:conversion
+=== Backward-porting CS:GO maps to CS:S ===
+
+This article provides a comprehensive guide for backward-porting maps from Counter-Strike: Global Offensive (CS:GO) to Counter-Strike: Source (CS:S). \\
+Backward-porting is the process of adapting a map created for a newer game engine to work with an older version of the engine. \\
+This guide is a work in progress and not feature-complete, as the porting process involves many complex steps and considerations that I myself am still actively learning.
+
+----
+
+=== Table of Contents ===
+  * Tools
+    * Mandatory Tools
+    * Optional Tools 
+
+  * Asset Preparation
+    * VTF 7.4 CS:GO Asset Library
+    * Extracting CS:GO Assets Manually
+    * Textures and Assets
+
+  * Texture Conversion
+    * Fast VTF Conversion
+    * Safe VTF Conversion
+
+  * 3D Models
+
+  * Entities
+    * Unsupported Entities
+    * Entities to Update
+
+  * Resources
+
+  * Todo
+
+  * Version
+
+----
+
+=== Mandatory Tools ===
+
+  - **[[https://github.com/jakgor471/BSPEntSpy|BSPEntSpy Enhanced]]** to decompile your map.
+    * Do this after you have prepared all of your assets.
+    * **Hammer++** might attempt to fix the errors otherwise.
+    * Make sure your prepared assets are located inside the root directory of your game that **Hammer++** is installed in.
+
+  - **[[https://ficool2.github.io/HammerPlusPlus-Website/index.html|Hammer++]]** to edit your map. 
+    * Loading a decompiled, incompatible map inside **Hammer** can mangle vertex alignments, and will most likely just crash after corrupting your VMF data.
+    * Loading the same map in **Hammer++** will automatically handle errors and fix most issues, and maintain precise VMF data.
+    * The **Check map for problems** feature inside **Hammer++** will identify and report issues that don't get fixed automatically.
+    * **Hammer++** contains **Propper++** which can be used for various prop and modelling purposes.
+
+  - **[[https://github.com/ruarai/CompilePal|CompilePalX]]** to recompile your map.
+    * Select the **Publish (Both)** setting with all boxes ticked except for ''Nav'' when compiling.
+    * Ensure that your Steam is open, and your assets are available in your root game directory
+
+  - **[[https://developer.valvesoftware.com/wiki/VIDE|VIDE]]** for asset related information and extraction.
+    * See the **Textures and Assets** section below.
+
+  - **[[https://developer.valvesoftware.com/wiki/VTFVer|VTFVer]]** or **[[https://github.com/Sky-rym/VTFEdit-Reloaded|VTFEdit Reloaded]]** for texture editing and conversion.
+    * See the **VTF Conversion** sections below.
+
+----
+
+=== Optional Tools ===
+
+  - **[[https://github.com/ZeqMacaw/Crowbar|Crowbar]]** for decompiling and recompiling 3D models with a 3D modelling software of your choice (not covered here).
+    * See the **3D Models** sections below.
+
+  - **[[https://developer.valvesoftware.com/wiki/GCFScape|GCFScape]]** for extracting base content from CS:GO or CS:S ''.vpk'' files.
+    * See the **Extracting CS:GO Assets Manually** section below.
+
+  - **[[https://notepad-plus-plus.org/|Notepad++]]** for editing text-based files, VSCode is preferable but Notepad++ is lightweight.
+
+----
+
+=== VTF 7.4 CS:GO Asset Library (CS:S Compatible) ===
+
+**[[https://drive.google.com/file/d/1Gz4EFzOsoRhWa839ef-2fDTZbBc4UVCQ/|Download]]**
+
+This download provides a library of the legacy base game assets for Counter-Strike: Global Offensive, extracted from ''.vpk'' files and converted to **VTF 7.4** format using **VTFVer**. \\
+This conversion addresses the compatibility issues that arise when working with CS:GO textures, which are often **VTF 7.5** format, and incompatible with earlier iterations of the Source engine, such as Counter-Strike: Source.  \\
+The purpose is to facilitate the process of backwards-porting CS:GO maps to legacy Source engine games by offering a centralized resource of pre-converted materials. \\
+This eliminates the need for individual users to download CS:GO, manually extract and then convert the textures that they need.   
+
+----
+
+=== Extracting CS:GO Assets Manually ===
+
+If any textures or content is missing or corrupted in the download above, you will need to manually download CSGO and use **GCFScape** to extract the content from ''csgo/pak01_dir.vpk''.
+
+  - Download **[[https://developer.valvesoftware.com/wiki/GCFScape|GCFScape]]** if you haven't already.
+  - Run **GCFScape** as Admin, and select ''Open''.
+  - Navigate the CSGO root directory (eg. ''C:\...\Steam\steamapps\common\Counter-Strike Source\csgo'').
+  - Select ''pak01_dir.vpk'' and wait for **GCFScape** to load the file.
+  - Right click the assets you need, and select ''Extract'' to save them.
+
+----
+
+=== Textures and Assets ===
+
+  - Download **[[https://developer.valvesoftware.com/wiki/VIDE|VIDE]]** if you haven't already.
+  - Open **VIDE** and click on **Pakfile Lump Editor**.
+  - Select the CS:GO ''.bsp'' file that you intend to port.
+  - Select the **Extract** button to extract all the embedded custom assets in the ''.bsp'' file.
+  - Select **Scan** after the file has been loaded into **VIDE**.
+  - Select **Browse** and select the root directory of your Source Engine game.
+    * eg. ''C:\...\Steam\steamapps\common\Counter-Strike Source\cstrike''
+  - Select **Scan** once again and wait for the scan to complete.
+  - All of the items listed in **Red** are missing and you need to find them.
+
+
+**Notes:**  
+  * Duplicate 3D models may display red, and they can safely be ignored if your game is ''dx90'' compatible.
+  * These are ''.mdl'', ''.phy'', ''.vvd'', and ''.vtx'' files for older versions, like ''dx80'' or ''dx70''.
+  * Ensure that they are superceded by an existing ''dx90'' version of the same model.
+  * Make sure to place the assets exactly where **VIDE** is expecting to find them, if you are not decompiling the models.
+
+----
+
+=== Fast VTF Conversion ===
+
+  - Make a backup of your ''.vtf'' files and the ''.bsp'' for your map.
+  - Download **[[https://developer.valvesoftware.com/wiki/VTFVer|VTFVer]]** if you haven't alredy.
+  - Run **VTFVer** as **Administrator**.
+  - Select the directory containing your ''.vtf'' files.
+  - Enable **Ignore Errors** if you have a lot of files, trust me.
+  - Select **Convert!** and once **VTFVer** is complete, you are done.  
+
+**Benefits:**  
+  * Handles an enormous amount of ''.vtf'' files at once.
+  * Relatively stable for most games and most textures.
+  * You can learn how to use it in 5 seconds.
+
+**Cons:**  
+  * Conversion is done automatically and uniformly with no control over conversion parameters. 
+  * Can rarely corrupt ''.vtf'' files for older games or dodgy textures, or if it just feels like it (nobody knows why).
+  * Less stable than other conversion tools.
+  * No longer maintained with active development.
+  * Compiling or packing corrupted ''.vtf'' files can completely brick a ''.bsp''.
+
+----
+
+=== Safe VTF Conversion ===
+
+  - Download **[[https://github.com/Sky-rym/VTFEdit-Reloaded|VTFEdit Reloaded]]** if you haven't already.
+  - Read **VTFEdit** documentation on GitHub and the **[[https://developer.valvesoftware.com/wiki/VTFEdit|VDC]]**.
+  - Learn about how **[[https://developer.valvesoftware.com/wiki/VTF_(Valve_Texture_Format)|VTF files]]** for your specific game are structured.
+  - Use **VTFEdit Reloaded** to do conversions with the correct input parameters for your project.
+
+**Benefits:**
+  * Much more stable with active community development.
+  * Fined tuned control over conversion parameters for specific games or textures.
+  * Ideal for dodgy textures, perfectionists or older games.
+  * Ideal for optimizing textures and map ports.
+
+**Cons:**
+  * Takes some time to learn and use.
+  * Probably not necessary for most projects.
+
+----
+
+=== 3D Models ===
+
+  - **Hammer++** will usually automatically fix most issues with your models.
+  - **Hammer++** includes **Propper++** which can handle smaller modelling tasks without the need for recompilation.
+  - For cases where you need to recompile a model, download **[[https://github.com/ZeqMacaw/Crowbar|Crowbar]]** if you haven't already.
+  - Use **Crowbar** to batch decompile the models in a folder.
+  - Open the decompiled ''.qc'' files and fix the incompatible model properties.
+  - Use **Crowbar** to recompile your models after you have made the necessary changes to the ''.qc'' file.
+
+**Notes:**
+  * Scripting collision, vmeshes and designing 3D models is beyond the scope of this document.
+  * Compiled models consist of ''.vvd'', ''.vtx'', ''.mdl'' and ''.phy'' files. They reference ''.vmt'' and ''.vtf'' files for texturing.
+  * Decompiled models consist of ''.smd'' and ''.qc'' files.
+
+**Files:**
+  * [[https://developer.valvesoftware.com/wiki/VVD|.vvd files]]
+  * [[https://developer.valvesoftware.com/wiki/VTX|.vtx files]]
+  * [[https://developer.valvesoftware.com/wiki/PHY|.phy files]]
+  * [[https://developer.valvesoftware.com/wiki/MDL|.mdl files]]
+  * [[https://developer.valvesoftware.com/wiki/SMD|.smd files]]
+  * [[https://developer.valvesoftware.com/wiki/QC|.qc files]]
+
+----
+
+=== Entities ===
+
+This section contains information about various entities that will need to be addressed, changed or manipulated for compatibility.  
+  * **Hammer++** can and will automatically fix many of these, use the **Check map for problems** feature to identify invalid keyvalues, inputs, outputs and entities that are not automatically fixed.
+  * This section is **heavily incomplete** and the CS:GO branch includes a significant amount of changes, but here are some ones I've identified.
+  * Confirm the accuracy of information here.
+
+----
+
+=== Unsupported Entities ===
+
+This list contains entities present in CS:GO that are not supported at all in CS:S. May not be complete or fully accurate. More research is needed.  
+
+  * ammo_357sig_np_reserve
+  * ammo_357sig_p250
+  * ammo_357sig_small
+  * ammo_556mm_small
+  * dangerzone_controller
+  * dz_door
+  * dangerzone_entity
+  * func_survival_c4_target
+  * func_tablet_blocker
+  * func_no_defuse
+  * func_nav_blocker
+  * game_coopmission_manager
+  * game_survival_logic
+  * game_money
+  * game_round_end
+  * info_deathmatch_spawn
+  * info_armsrace_counterterrorist
+  * info_armsrace_terrorist
+  * info_enemy_terrorist_spawn
+  * info_gascanister_launchpoint
+  * info_map_region
+  * info_paradrop_denial
+  * info_survival_crate_spawn
+  * item_coop_coin
+  * item_cash
+  * item_cutters
+  * item_dogtags
+  * item_heavyassaultsuit
+  * mapvetopick_controller
+  * molotov_projectile
+  * npc_heardanger
+  * pet_entity
+  * planted_c4_training
+  * planted_c4_survival
+  * point_dz_dronegun
+  * point_dz_parachute
+  * point_dz_weaponspawn
+  * point_dz_weaponspawn_group
+  * point_give_ammo
+  * point_hiding_spot
+  * point_worldtext
+  * point_viewcontrol_multiplayer
+  * prop_counter
+  * prop_dynamic_glow
+  * prop_exploding_barrel
+  * prop_mapplaced_long_use_entity
+  * prop_ammo_box_generic
+  * prop_loot_crate
+  * prop_metal_crate
+  * prop_money_crate
+  * prop_paradrop_crate
+  * prop_weapon_upgrade_armor
+  * prop_weapon_upgrade_armor_helmet
+  * prop_weapon_upgrade_chute
+  * prop_weapon_upgrade_contractkill
+  * prop_weapon_upgrade_exojump
+  * prop_weapon_upgrade_helmet
+  * prop_weapon_upgrade_tablet_droneintel
+  * prop_weapon_upgrade_tablet_highres
+  * prop_weapon_upgrade_tablet_zoneintel
+  * prop_weapon_refill_heavyarmor
+  * skybox_swapper
+  * trigger_bomb_reset
+  * trigger_softbarrier
+  * trigger_survival_maproom
+  * trigger_survival_maproom_table
+  * trigger_survival_playarea
+  * trigger_safemoneygather
+  * vgui_world_text_panel
+  * weapon_bizon
+  * weapon_cz75a
+  * weapon_decoy
+  * weapon_fists
+  * weapon_galilar (weapon_galil in CS:S)
+  * weapon_healthshot
+  * weapon_hkp2000
+  * weapon_incgrenade
+  * weapon_knifegg
+  * weapon_knife_ghost
+  * weapon_knife_t
+  * weapon_m4a1_silencer (weapon_m4a1 in CS:S)
+  * weapon_mag7
+  * weapon_molotov
+  * weapon_mp5sd
+  * weapon_mp7
+  * weapon_negev
+  * weapon_nova
+  * weapon_revolver
+  * weapon_breachcharge
+  * weapon_bumpmine
+  * weapon_scar20
+  * weapon_sawedoff
+  * weapon_sg556
+  * weapon_ssg08 (weapon_scout in CS:S)
+  * weapon_tagrenade
+  * weapon_taser
+  * weapon_zone_repulsor
+  * weapon_mp9 (weapon_tmp in CS:S)
+  * weapon_usp_silver
+  * weapon_axe
+  * weapon_breachcharge
+  * weapon_bumpmine
+  * weapon_diversion
+  * weapon_hammer
+  * weapon_melee
+  * weapon_shield
+  * weapon_snowball
+  * weapon_spanner
+  * weapon_tablet
+  * hegrenade_projectile (weapon_hegrenade in CS:S)
+  * flashbang_projectile (weapon_flashbang in CS:S)
+  * breachcharge_projectile
+  * bumpmine_projectile
+  * decoy_projectile
+  * molotov_projectile
+  * snowball_projectile
+  * tagrenade_projectile
+  * cfe_player_decal
+  * chicken
+  * drone
+  * dronegun
+  * grassburn
+  * item_cash
+  * item_cutters
+  * item_dogtags
+  * item_heavyassaultsuit
+  * paradrop_chopper
+  * radar_jammer
+  * survival_spawn_chopper
+  * ent_snowball_pile
+
+----
+
+=== Entities to Update ===
+
+This list contains entities that are supported in CS:S, but contain keyvalues in CS:GO that are not supported in CS:S. 
+
+1. ''info_player_counterterrorist'' and ''info_player_terrorist''
+  * Remove: ''priority'', ''enabled''
+  * Remove inputs: ''SetEnabled'', ''SetDisabled'', ''ToggleEnabled''
+
+2. ''hostage_entity''
+  * Remove: ''HostageSpawnRandomFactor'', ''HostageSpawnExclusionGroup1-25''
+  * Remove outputs: ''OnHostageBeginGrab'', ''OnFirstPickedUp'', ''OnDroppedNotRescued'', ''OnRescued''
+
+3. ''info_map_parameters''
+  * Remove: ''petpopulation'', ''usenormalspawnsfordm'', ''disableautogenerateddmspawns'', ''botmaxvisiondistance'', ''fadeplayervisibilityfarz''
+
+4. ''func_buyzone''
+  * Remove inputs: ''SetEnabled'', ''SetDisabled'', ''SetTeam_TerroristOnly'', ''SetTeam_CTOnly'', ''SetTeam_AllTeams'', ''SetTeam_None''
+  
+5. ''func_bomb_target''
+  * Remove: ''heistbomb'' (boolean), ''bomb_mount_target'' (string)
+  
+6. Weapons (all ''weapon_'' entities)
+  * Remove: ''CanBePickedUp''
+  * Remove inputs: ''SetReserveAmmoAmount'', ''SetAmmoAmount'', ''ToggleCanBePickedUp''
+  
+7. ''filter_activator_team''
+  * Adjust: ''filterteam'' choices (remove -1: "None" and 0: "All Teams")
+
+8. ''game_text''
+  * Remove: ''color2'', ''effect'', ''fadein'', ''fadeout'', ''fxtime'', ''holdtime'', ''x'', ''y'', ''channel''
+
+9. ''env_sprite''
+  * Remove: ''GlowProxySize'', ''HDRColorScale''
+
+10. ''light_dynamic''
+  * Remove: ''style'', ''pattern'', ''TextureFrameRate''
+
+11. ''prop_physics''
+  * Remove: ''physdamagescale'', ''inertiaScale'', ''massScale'', ''overridescript''
+  
+12. ''trigger_multiple''
+  * Remove: ''filtername'', ''StartDisabled''
+  
+13. ''func_breakable''
+  * Remove: ''minhealthdmg'', ''physdamagescale''
+  
+14. ''info_particle_system''
+  * Remove: ''cpoint1'', ''cpoint2'', ''cpoint3'', ''cpoint4'', ''cpoint5'', ''cpoint6'', ''cpoint7''
+
+15. ''env_soundscape''
+  * Remove: ''radius'', ''soundpositionoverride''
+  
+16. ''point_template''
+  * Remove: ''PreserveEntity''
+
+**Notes:**
+  * This list may be incorrect or incomplete. 
+  * For a more thorough analysis, review the FGD files included in the CSGO content download provided in the asset library above.
+  * You will need to update the skybox to one supported by **[[https://developer.valvesoftware.com/wiki/Counter-Strike_Source_Sky_List|CS:S]]** or use a custom skybox.
+
+----
+
+=== Resources ===
+
+  * Updates made from the HL2 to CSGO engine branches can be reviewed in the commit history of my **[[https://github.com/followingthefasciaplane/source-engine-diff-check/tree/main/misc|Source Engine Diff Checker]]** GitHub repository.
+
+  * **[[https://developer.valvesoftware.com/wiki/Main_Page|Valve Developer Community Wiki]]**
+
+----
+
+=== Todo ===
+
+  * Expand on section to adjust any custom entities or logic that rely on CS:GO specific features. 
+  * Expand on all texture and modelling sections.
+  * Add section about props and geometry.
+  * Add section about VPhysics and collision meshes.
+  * Add section about reviewing and simplify complex trigger setups that may not be supported in CS:S. 
+  * Add section to check for uses of enhanced particle systems or effects that may not exist in CS:S like lighting, shadows, etc.
+  * Go over other potential files and what each file does.
+  * Add a section for sounds.
+  * Add a section for VScripts.
+  * Confirm with more research.
+
+----
+
+=== Version ===
+
+Article version: 1.0 \\
+Date: 10/7/2024
