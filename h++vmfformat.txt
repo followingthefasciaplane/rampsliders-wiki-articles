@@ -1,0 +1,1050 @@
+// https://rampsliders.wiki/doku.php?id=mapping:geometry_vmf
+==== Comprehensive Guide to the Valve Map Format (VMF) for Counter-Strike: Source and Hammer++ ====
+
+This guide provides an extensive exploration of the **Valve Map Format (VMF)**, the file format used by the Source Engine's Hammer Editor and its enhanced version, **Hammer++**. \\
+This guide includes detailed information on Hammer++ extensions, advanced mapping techniques, and in-depth explanations of the VMF file structure.
+
+----
+
+==== Table of Contents ====
+
+  * [[#introduction|1. Introduction]]
+  * [[#vmf-file-structure|2. VMF File Structure]]
+    * [[#syntax-and-formatting|2.1 Syntax and Formatting]]
+    * [[#data-types|2.2 Data Types]]
+  * [[#main-classes-in-vmf|3. Main Classes in VMF]]
+    * [[#versioninfo|3.1 versioninfo]]
+    * [[#visgroups|3.2 visgroups]]
+    * [[#viewsettings|3.3 viewsettings]]
+    * [[#palette_plus-hammer|3.4 palette_plus (Hammer++)]]
+    * [[#colorcorrection_plus-hammer|3.5 colorcorrection_plus (Hammer++)]]
+    * [[#light_plus-hammer|3.6 light_plus (Hammer++)]]
+    * [[#postprocess_plus-hammer|3.7 postprocess_plus (Hammer++)]]
+    * [[#bgimages_plus-hammer|3.8 bgimages_plus (Hammer++)]]
+    * [[#world|3.9 world]]
+    * [[#entity|3.10 entity]]
+    * [[#hidden|3.11 hidden]]
+    * [[#cameras|3.12 cameras]]
+    * [[#cordons|3.13 cordons]]
+  * [[#subclasses-and-nested-structures|4. Subclasses and Nested Structures]]
+    * [[#solid|4.1 solid]]
+    * [[#side|4.2 side]]
+      * [[#vertices_plus-hammer|4.2.1 vertices_plus (Hammer++)]]
+      * [[#dispinfo|4.2.2 dispinfo]]
+    * [[#editor|4.3 editor]]
+    * [[#group|4.4 group]]
+    * [[#connections|4.5 connections]]
+  * [[#mathematical-foundations|5. Mathematical Foundations]]
+    * [[#vector-operations|5.1 Vector Operations]]
+    * [[#plane-equations|5.2 Plane Equations]]
+    * [[#brush-geometry|5.3 Brush Geometry]]
+  * [[#advanced-features|6. Advanced Features]]
+    * [[#displacement-maps|6.1 Displacement Maps]]
+    * [[#instances-hammer|6.2 Instances (Hammer++)]]
+    * [[#hidden-geometry|6.3 Hidden Geometry]]
+    * [[#hammer-extensions|6.4 Hammer++ Extensions]]
+  * [[#versioning-and-compatibility|7. Versioning and Compatibility]]
+  * [[#common-vmf-patterns-and-examples|8. Common VMF Patterns and Examples]]
+  * [[#references-and-resources|9. References and Resources]]
+
+----
+
+==== 1. Introduction ====
+
+The **Valve Map Format (VMF)** is a plain-text file format used by the **Hammer Editor**, the official level design tool for the Source Engine. \\
+VMF files describe every aspect of a map, including geometry, entities, textures, and environmental details. \\
+This guide focuses on VMF usage incorporating features from **Hammer++**, an enhanced version of Hammer that introduces new functionalities and quality-of-life improvements. 
+
+----
+
+==== 2. VMF File Structure ====
+
+=== 2.1 Syntax and Formatting ===
+
+VMF files use a hierarchical, plain-text format with braces ''{}'' to denote nested structures. Each element is defined as a class with properties specified as key-value pairs.
+
+**Basic Structure:**
+<code>
+// Comment
+ClassName
+{
+    "key" "value"
+    SubClass
+    {
+        "subkey" "subvalue"
+    }
+}
+</code>
+
+**Key Features:**
+  * **Comments**: Use double-slash for single-line comments.
+  * **Classes and Subclasses**: Defined using braces ''{}''.
+  * **Properties**: Specified as key-value pairs.
+  * **Case Sensitivity**: VMF is case-sensitive; ''classname'' and ''ClassName'' are different.
+  * **Encoding**: Files are encoded in UTF-8.
+  * **Indentation**: While not required, consistent indentation improves readability.
+
+**Example:**
+
+<code>
+world
+{
+    "id" "1"
+    "classname" "worldspawn"
+    solid
+    {
+        // Solid definition
+    }
+}
+</code>
+
+----
+
+=== 2.2 Data Types ===
+
+^ Type          ^ Description                                       ^ Example                         ^
+| **int**       | Integer value                                     | ''"id" "1"''                      |
+| **float**     | Floating-point number                             | ''"rotation" "0.25"''             |
+| **string**    | Text string                                       | ''"classname" "func_door"''       |
+| **bool**      | Boolean value (''"0"'' or ''"1"'')                    | ''"active" "1"''                  |
+| **vector3**   | Three float values representing coordinates       | ''"origin" "(0 0 0)"''            |
+| **vector2**   | Two float values (used in logical positions)      | ''"logicalpos" "[0 0]"''          |
+| **color**     | RGB color values (integers 0-255)                 | ''"color" "255 128 0"''           |
+| **color255**  | RGBA color values (integers 0-255)                | ''"rendercolor" "255 128 0 255"'' |
+| **bitflags**  | Integer representing flags                        | ''"spawnflags" "3"''              |
+
+----
+
+==== 3. Main Classes in VMF ====
+
+The VMF file is composed of several main classes, each serving a specific purpose in defining the map's structure and properties.
+
+----
+
+=== 3.1 versioninfo ===
+
+Contains metadata about the VMF file and the editor used to create it.
+
+**Structure:**
+
+<code>
+versioninfo
+{
+    "editorversion" "400"
+    "editorbuild" "4532"
+    "mapversion" "1"
+    "formatversion" "100"
+    "prefab" "0"
+}
+</code>
+
+**Properties:**
+
+  * ''"editorversion"'': (int) Version of the Hammer Editor.
+  * ''"editorbuild"'': (int) Build number of the editor.
+  * ''"mapversion"'': (int) Number of times the map has been saved.
+  * ''"formatversion"'': (int) VMF format version (typically "100").
+  * ''"prefab"'': (bool) Indicates if the file is a prefab (''"1"'') or not (''"0"'').
+
+----
+
+=== 3.2 visgroups ===
+
+Used to organize objects into visibility groups within Hammer, aiding in map organization and editing efficiency.
+
+**Structure:**
+
+<code>
+visgroups
+{
+    visgroup
+    {
+        "name" "Group Name"
+        "visgroupid" "1"
+        "color" "255 0 0"
+        visgroup
+        {
+            // Nested visgroup
+        }
+    }
+    // Additional visgroups...
+}
+</code>
+
+**Properties:**
+
+  * ''"name"'': (string) Name of the visgroup.
+  * ''"visgroupid"'': (int) Unique identifier.
+  * ''"color"'': (color) RGB color assigned to the visgroup.
+
+----
+
+=== 3.3 viewsettings ===
+
+Defines the visual settings of the Hammer Editor viewport.
+
+**Structure:**
+
+<code>
+viewsettings
+{
+    "bSnapToGrid" "1"
+    "bShowGrid" "1"
+    "bShowLogicalGrid" "0"
+    "nGridSpacing" "64"
+    "bShow3DGrid" "0"
+}
+</code>
+
+**Properties:**
+
+  * ''"bSnapToGrid"'': (bool) Enables grid snapping.
+  * ''"bShowGrid"'': (bool) Displays the 2D grid.
+  * ''"bShowLogicalGrid"'': (bool) Displays the logical grid.
+  * ''"nGridSpacing"'': (int) Grid spacing in units.
+  * ''"bShow3DGrid"'': (bool) Displays the 3D grid.
+
+----
+
+=== 3.4 palette_plus (Hammer++) ===
+
+**Purpose**: Defines custom color palettes for use within the Hammer++ editor.
+
+**Structure:**
+
+<code>
+palette_plus
+{
+    "color0" "255 255 255"
+    "color1" "255 255 255"
+    // Up to "color15"
+}
+</code>
+
+**Properties:**
+
+  * ''"colorX"'': (color) Defines the RGB values for palette slot X (where X is an integer from 0 to 15).
+
+**Usage:**
+
+  * Allows mappers to customize editor colors for better visual organization.
+
+----
+
+=== 3.5 colorcorrection_plus (Hammer++) ===
+
+**Purpose**: Adds advanced color correction settings to the map.
+
+**Structure:**
+
+<code>
+colorcorrection_plus
+{
+    "name0" ""
+    "weight0" "1"
+    // Up to "name3" and "weight3"
+}
+</code>
+
+**Properties:**
+
+  * ''"nameX"'': (string) Name or path to a color correction LUT (Look-Up Table) file.
+  * ''"weightX"'': (float) Weighting factor for the corresponding LUT.
+
+**Usage:**
+
+  * Allows for blending multiple color correction files.
+  * Enhances visual effects and atmosphere.
+
+----
+
+=== 3.6 light_plus (Hammer++) ===
+
+**Purpose**: Provides advanced lighting options and parameters.
+
+**Structure:**
+
+<code>
+light_plus
+{
+    "samples_sun" "6"
+    "samples_ambient" "40"
+    "samples_vis" "256"
+    "texlight" ""
+    // Additional properties...
+}
+</code>
+
+**Properties:**
+
+  * ''"samples_sun"'': (int) Number of samples for sun lighting.
+  * ''"samples_ambient"'': (int) Number of ambient samples.
+  * ''"samples_vis"'': (int) Number of visibility samples.
+  * ''"texlight"'': (string) Path to a texture light data file.
+  * Other properties control various lighting aspects like ''"incremental_delay"'', ''"bake_dist"'', etc.
+
+**Usage:**
+
+  * Fine-tunes the lighting process for better visual quality.
+  * Can impact compile times and performance.
+
+----
+
+=== 3.7 postprocess_plus (Hammer++) ===
+
+**Purpose**: Adds post-processing effects to the map.
+
+**Structure:**
+
+<code>
+postprocess_plus
+{
+    "enable" "1"
+    "bloom_scale" "1"
+    "bloom_exponent" "2.5"
+    // Additional properties...
+}
+</code>
+
+**Properties:**
+
+  * ''"enable"'': (bool) Enables or disables post-processing.
+  * ''"bloom_scale"'': (float) Adjusts the intensity of bloom effects.
+  * ''"bloom_exponent"'': (float) Controls the bloom threshold.
+  * Additional properties for exposure, tonemapping, vignette, etc.
+
+**Usage:**
+
+  * Enhances visual fidelity with effects like bloom, HDR, and vignette.
+  * Requires engine support; may not fully function in Counter-Strike: Source without modifications.
+
+----
+
+=== 3.8 bgimages_plus (Hammer++) ===
+
+**Purpose**: Allows the use of background images within the Hammer++ editor for reference.
+
+**Structure:**
+
+<code>
+bgimages_plus
+{
+    // Configuration for background images
+}
+</code>
+
+**Usage:**
+
+  * Useful for aligning map geometry with reference images.
+  * Configured within the editor; may not affect the VMF structure significantly.
+
+----
+
+=== 3.9 world ===
+
+Represents the main geometry and global properties of the map.
+
+**Structure:**
+
+<code>
+world
+{
+    "id" "1"
+    "mapversion" "1"
+    "classname" "worldspawn"
+    "skyname" "sky_dust"
+    "comment" "This is a sample map."
+    solid
+    {
+        // Solid definition
+    }
+    // Additional solids and properties...
+}
+</code>
+
+**Properties:**
+
+  * ''"id"'': (int) Unique identifier.
+  * ''"mapversion"'': (int) Should match the ''"mapversion"'' in ''versioninfo''.
+  * ''"classname"'': (string) Always ''"worldspawn"''.
+  * ''"skyname"'': (string) Name of the skybox texture.
+  * ''"comment"'': (string) Optional notes or comments about the map.
+
+**Nested Classes:**
+
+  * **solid**: Defines brush geometry.
+  * **group**: Groups multiple objects.
+  * **hidden**: Contains hidden brushes.
+
+----
+
+=== 3.10 entity ===
+
+Defines dynamic elements in the map, including point entities and brush entities.
+
+**Structure:**
+
+<code>
+entity
+{
+    "id" "100"
+    "classname" "light"
+    "spawnflags" "0"
+    "origin" "(256 256 128)"
+    "_light" "255 255 255 200"
+    // Entity-specific properties...
+    connections
+    {
+        // Output definitions
+    }
+    solid
+    {
+        // Brush entity geometry
+    }
+    editor
+    {
+        // Editor properties
+    }
+}
+</code>
+
+**Properties:**
+
+  * ''"id"'': (int) Unique identifier.
+  * ''"classname"'': (string) Type of entity (e.g., ''"func_door"'').
+  * ''"spawnflags"'': (bitflags) Flags affecting entity behavior.
+  * ''"origin"'': (vector3) Position in the map.
+  * Entity-specific properties (e.g., ''"_light"'' for light entities).
+
+**Nested Classes:**
+
+  * **connections**: Defines outputs and events.
+  * **solid**: For brush entities.
+  * **editor**: Contains editor-specific data.
+  * **hidden**: Contains hidden entities.
+
+**Note on Entity-Specific Properties:**
+
+  * Each entity can have unique properties based on its ''classname''.
+  * For example, ''func_breakable'' entities have properties like ''"health"'', ''"material"'', and ''"explodemagnitude"''.
+  * Refer to [[https://developer.valvesoftware.com/wiki/List_of_entities|VDC]] for list of entities and their properties.
+
+----
+
+=== 3.11 hidden ===
+
+Contains objects (solids or entities) that are hidden in the editor.
+
+**Structure:**
+
+<code>
+hidden
+{
+    solid
+    {
+        // Hidden solid definition
+    }
+    entity
+    {
+        // Hidden entity definition
+    }
+}
+</code>
+
+**Usage:**
+
+  * Objects under the ''hidden'' class have their ''"visgroupshown"'' or ''"visgroupautoshown"'' properties set to ''"0"'' in their ''editor'' subclass.
+  * Helps in organizing and temporarily hiding elements during the mapping process.
+
+----
+
+=== 3.12 cameras ===
+
+Stores saved camera positions and orientations within the editor.
+
+**Structure:**
+
+<code>
+cameras
+{
+    "activecamera" "-1"
+    camera
+    {
+        "position" "(0 0 0)"
+        "look" "(0 1 0)"
+    }
+    // Additional cameras...
+}
+</code>
+
+**Properties:**
+
+  * ''"activecamera"'': (int) Index of the active camera (''"-1"'' if none).
+  * ''"position"'': (vector3) Camera's position.
+  * ''"look"'': (vector3) Point the camera is looking at.
+
+----
+
+=== 3.13 cordons ===
+
+Defines specific regions of the map for focused editing and compiling.
+
+**Structure:**
+
+<code>
+cordons
+{
+    "active" "1"
+    cordon
+    {
+        "name" "Cordon Name"
+        "active" "1"
+        box
+        {
+            "mins" "(-512 -512 -512)"
+            "maxs" "(512 512 512)"
+        }
+    }
+    // Additional cordons...
+}
+</code>
+
+**Properties:**
+
+  * ''"active"'': (bool) Whether cordoning is active.
+  * ''"name"'': (string) Name of the cordon.
+  * ''"mins"'' and ''"maxs"'': (vector3) Coordinates defining the cordon's bounding box.
+
+----
+
+==== 4. Subclasses and Nested Structures ====
+
+Subclasses are nested within main classes and define more detailed aspects of the map.
+
+----
+
+=== 4.1 solid ===
+
+Defines a brush, the fundamental building block of map geometry.
+
+**Structure:**
+
+<code>
+solid
+{
+    "id" "200"
+    side
+    {
+        // Side definition
+    }
+    // Additional sides...
+    editor
+    {
+        // Editor properties
+    }
+}
+</code>
+
+**Properties:**
+
+  * ''"id"'': (int) Unique identifier.
+  * **side**: One per face of the brush.
+  * **editor**: Contains editor-specific data.
+  * **hidden**: Contains hidden sides (if any).
+
+----
+
+=== 4.2 side ===
+
+Defines a face of a brush.
+
+**Structure:**
+
+<code>
+side
+{
+    "id" "201"
+    "plane" "(0 0 0) (0 0 128) (128 0 128)"
+    "material" "BRICK/BRICKWALL001A"
+    "uaxis" "[1 0 0 0] 0.25"
+    "vaxis" "[0 -1 0 0] 0.25"
+    "rotation" "0"
+    "lightmapscale" "16"
+    "smoothing_groups" "0"
+    // Optional: dispinfo
+    // Optional (Hammer++): vertices_plus
+}
+</code>
+
+**Properties:**
+
+  * ''"id"'': (int) Unique identifier.
+  * ''"plane"'': (vector3 x3) Three points defining the plane.
+  * ''"material"'': (string) Texture path.
+  * ''"uaxis"'' and ''"vaxis"'': (string) Texture mapping axes and scale.
+  * ''"rotation"'': (float) Texture rotation in degrees.
+  * ''"lightmapscale"'': (int) Lightmap resolution.
+  * ''"smoothing_groups"'': (int) Used for shading across faces.
+  * ''"contents"'' and ''"flags"'': (bitflags) Surface and content properties (not commonly used in Hammer++).
+
+----
+
+=== 4.2.1 vertices_plus ===
+
+**Purpose**: Provides explicit vertex definitions for a brush face, allowing for more complex and precise geometry.
+
+**Structure:**
+
+<code>
+vertices_plus
+{
+    "v" "x y z"
+    // Additional vertices...
+}
+</code>
+
+**Properties:**
+
+  * ''"v"'': (vector3) Coordinates of a vertex.
+
+**Usage:**
+
+  * Defines the vertices of a face explicitly, useful for non-planar or complex shapes.
+  * Enhances precision in geometry definition.
+
+----
+
+=== 4.2.2 dispinfo ===
+
+Used to create terrain-like surfaces with variable heights.
+
+**Structure:**
+
+<code>
+dispinfo
+{
+    "power" "3"
+    "startposition" "(0 0 0)"
+    "elevation" "0"
+    "subdiv" "0"
+    normals
+    {
+        "row0" "0 0 1 0 0 1 ..."
+        // Additional rows...
+    }
+    distances
+    {
+        "row0" "0 1 2 ..."
+        // Additional rows...
+    }
+    offsets
+    {
+        "row0" "0 0 0 0 0 0 ..."
+        // Additional rows...
+    }
+    offset_normals
+    {
+        "row0" "0 0 1 0 0 1 ..."
+        // Additional rows...
+    }
+    alphas
+    {
+        "row0" "0 0.5 1 ..."
+        // Additional rows...
+    }
+    triangle_tags
+    {
+        "row0" "0 0 0 ..."
+        // Additional rows...
+    }
+    allowed_verts
+    {
+        // Vertex indices
+    }
+}
+</code>
+
+**Properties:**
+
+  * ''"power"'': (int) Determines the grid resolution (''2^power + 1'').
+  * ''"startposition"'': (vector3) Base position.
+  * ''"elevation"'': (float) Elevation offset.
+  * ''"subdiv"'': (bool) Indicates subdivision.
+  * **normals**, **distances**, **offsets**, **offset_normals**, **alphas**, **triangle_tags**, **allowed_verts**: Arrays defining the displacement.
+
+**Note on Displacements:**
+
+  * Displacement data can be extensive due to the number of vertices involved.
+  * Modifying displacements manually is complex; it's recommended to use the editor tools.
+
+----
+
+=== 4.3 editor ===
+
+Contains metadata used by the Hammer Editor.
+
+**Structure:**
+
+<code>
+editor
+{
+    "color" "220 30 220"
+    "groupid" "0"
+    "visgroupshown" "1"
+    "visgroupautoshown" "1"
+    "logicalpos" "[0 0]"
+    "comments" "This is a sample entity."
+}
+</code>
+
+**Properties:**
+
+  * ''"color"'': (color) Editor display color.
+  * ''"groupid"'': (int) Group identifier.
+  * ''"visgroupshown"'': (bool) Visibility in the editor.
+  * ''"visgroupautoshown"'': (bool) Automatic visibility.
+  * ''"logicalpos"'': (vector2) Position in logical view.
+  * ''"comments"'': (string) Notes or comments displayed in the editor (entities only).
+
+----
+
+=== 4.4 group ===
+
+Groups multiple objects together for easier management.
+
+**Structure:**
+
+<code>
+group
+{
+    "id" "300"
+    // Nested solids or entities
+    editor
+    {
+        // Editor properties
+    }
+}
+</code>
+
+**Properties:**
+
+  * ''"id"'': (int) Unique identifier.
+
+----
+
+=== 4.5 connections ===
+
+Defines outputs for entities, allowing event-driven interactions.
+
+**Structure:**
+
+<code>
+connections
+{
+    "OnEventName" "TargetEntity,Input,Parameter,Delay,Times"
+    // Additional connections...
+}
+</code>
+
+**Example:**
+
+<code>
+connections
+{
+    "OnBreak" "telesound,PlaySound,,0,-1"
+    "OnBreak" "tele_end_ct,Enable,,0,-1"
+}
+</code>
+
+**Properties Explained:**
+
+  * **OnEventName**: Event triggering the output (e.g., ''"OnPressed"'').
+  * **TargetEntity**: Name of the entity to receive the input.
+  * **Input**: The input to be triggered on the target (e.g., ''"Open"'').
+  * **Parameter**: Any parameters required (often left empty).
+  * **Delay**: (float) Time in seconds before the input is triggered.
+  * **Times**: (int) Number of times the output can be triggered (''"-1"'' for infinite).
+
+----
+
+==== 5. Mathematical Foundations ====
+
+Understanding the mathematical concepts behind VMF structures is crucial for advanced mapping techniques.
+
+----
+
+=== 5.1 Vector Operations ===
+
+Vectors are fundamental in defining positions and directions in 3D space.
+
+**Dot Product:**
+
+  a · b = ax*bx + ay*by + az*bz
+
+**Uses:**
+  * Calculating angles between vectors.
+  * Determining whether two vectors are perpendicular.
+
+**Cross Product:**
+
+  a × b = ( ay*bz - az*by, az*bx - ax*bz, ax*by - ay*bx )
+
+**Uses:**
+  * Finding a vector perpendicular to both **a** and **b**.
+  * Calculating normals for planes.
+
+**Vector Normalization:**
+
+Converting a vector to a unit vector:
+
+  â = a / |a|
+
+----
+
+=== 5.2 Plane Equations ===
+
+A plane can be defined using a point **p₀** and a normal vector **n**:
+
+  nx(x - x0) + ny(y - y0) + nz(z - z0) = 0
+
+Simplified as:
+
+  n · p - d = 0
+
+Where:
+  * **p** is any point on the plane.
+  * **d** is the distance from the origin to the plane along the normal.
+
+**Defining Planes in VMF:**
+
+Planes are defined by three non-colinear points //(p₁, p₂, p₃)//:
+  * Compute the normal: **n** = (**p₂** - **p₁**) × (**p₃** - **p₁**)
+  * Normalize **n**.
+
+----
+
+=== 5.3 Brush Geometry ===
+
+Brushes are convex polyhedra formed by intersecting planes.
+
+**Key Concepts:**
+
+  * **Vertices**: Points where three planes intersect.
+  * **Edges**: Lines where two planes intersect.
+  * **Faces**: Defined by the planes.
+
+**Constructing Brushes:**
+
+  * Ensure all faces define a convex shape.
+  * Planes must be defined in such a way that they enclose a finite volume.
+
+----
+
+==== 6. Advanced Features ====
+
+----
+
+=== 6.1 Displacement Maps ===
+
+Displacement maps create realistic terrain by modifying brush faces.
+
+**Key Points:**
+
+  * Applied to a face (side) of a brush.
+  * Use the **dispinfo** subclass to define displacement properties.
+  * **Power** determines the resolution.
+
+**Considerations:**
+
+  * Displacements should not seal the map (avoid leaks).
+  * Overuse can impact performance.
+
+----
+
+=== 6.2 Instances (Hammer++) ===
+
+Instances allow mappers to reference external VMF files within a map, promoting modular design.
+
+**Structure:**
+
+<code>
+entity
+{
+    "id" "400"
+    "classname" "func_instance"
+    "file" "maps/instances/example.vmf"
+    "origin" "(0 0 0)"
+    "angles" "(0 0 0)"
+    "fixup_style" "0"
+    editor
+    {
+        // Editor properties
+    }
+}
+</code>
+
+**Properties:**
+
+  * ''"file"'': (string) Path to the instance VMF file.
+  * ''"origin"'': (vector3) Position offset.
+  * ''"angles"'': (vector3) Rotation.
+  * ''"fixup_style"'': (int) Determines how variables are handled.
+
+**Usage in Counter-Strike: Source:**
+
+  * Not natively supported; requires additional tools like **CompilePal** or **VIDE** to bake instances into the final BSP.
+  * Enhances workflow efficiency by allowing reuse of common elements.
+
+----
+
+=== 6.3 Hidden Geometry ===
+
+The ''hidden'' class stores objects (solids or entities) that are hidden in the editor.
+
+**Usage:**
+
+  * Helps organize the map by hiding unnecessary elements during editing.
+  * Objects under ''hidden'' are not compiled unless unhidden.
+
+----
+
+=== 6.4 Hammer++ Extensions ===
+
+Hammer++ introduces additional features and enhancements.
+
+**Notable Extensions:**
+
+  * **vertices_plus**: Allows for complex vertex manipulation.
+  * **light_plus**: Advanced lighting options, including sample counts and per-face settings.
+  * **colorcorrection_plus**: Enhanced color correction entities.
+  * **postprocess_plus**: Adds post-processing effects like bloom and HDR.
+  * **bgimages_plus**: Background images in the editor for reference.
+  * **palette_plus**: Customizable editor color palettes.
+  * **instancing**: Allows use of instances.
+
+**Compatibility Considerations:**
+
+  * Some features may not be fully compatible with the standard Counter-Strike: Source engine.
+  * Testing is essential to ensure functionality.
+  * Using third-party tools like **SourceMod** or **Metamod** plugins can help implement certain advanced features.
+
+----
+
+==== 7. Versioning and Compatibility ====
+
+**Versioning Properties:**
+
+  * ''"mapversion"'': Incremented with each save; useful for version control.
+  * ''"formatversion"'': Should match the expected VMF format for the engine.
+
+**Compatibility Tips:**
+
+  * **Hammer++ Features**: Be cautious when using extensions; verify in-game.
+  * **Testing**: Regularly compile and test the map to catch issues early.
+  * **Updates**: Keep Hammer++ and compile tools up to date.
+
+**Fact Checking:**
+
+  * Ensure that all entities and properties are supported by the game engine.
+  * Verify that custom properties do not cause compile errors or in-game issues.
+  * Stay informed about updates to Hammer++ and the Source SDK.
+
+----
+
+==== 8. Common VMF Patterns and Examples ====
+
+----
+
+=== 8.1 Brush with vertices_plus (Hammer++) ===
+
+<code>
+solid
+{
+    "id" "3547"
+    side
+    {
+        "id" "3548"
+        "plane" "(-285.939 -4096 556) (-285.939 -4096 118) (-285.939 -4092 118)"
+        vertices_plus
+        {
+            "v" "-285.939 -4096 556"
+            "v" "-285.939 -4096 118"
+            "v" "-285.939 -4092 118"
+            "v" "-285.939 -4092 556"
+        }
+        "material" "TOOLS/TOOLSNODRAW"
+        // Additional properties...
+    }
+    // Additional sides...
+}
+</code>
+
+----
+
+=== 8.2 Entity with connections ===
+
+<code>
+entity
+{
+    "id" "5499"
+    "classname" "trigger_multiple"
+    "origin" "498 -457.5 -4040"
+    "spawnflags" "1"
+    "StartDisabled" "0"
+    "targetname" "strip3"
+    "wait" "1"
+    connections
+    {
+        "OnStartTouch" "strip1,Strip,,0,-1"
+    }
+    solid
+    {
+        // Solid definition...
+    }
+    editor
+    {
+        "logicalpos" "[2000 -8768]"
+    }
+}
+</code>
+
+----
+
+=== 8.3 Using light_plus and postprocess_plus (Hammer++) ===
+
+<code>
+light_plus
+{
+    "samples_sun" "6"
+    "samples_ambient" "40"
+    // Additional properties...
+}
+
+postprocess_plus
+{
+    "enable" "1"
+    "bloom_scale" "1"
+    "bloom_exponent" "2.5"
+    // Additional properties...
+}
+</code>
+
+----
+
+==== 10. References and Resources ====
+
+  * **Valve Developer Community**:
+    * [[https://developer.valvesoftware.com/wiki/VMF|VMF File Format]]
+    * [[https://developer.valvesoftware.com/wiki/Hammer_Editor|Hammer Editor Documentation]]
+  * **Hammer++ Official Site**:
+    * [[https://ficool2.github.io/HammerPlusPlus-Website/|Hammer++ Documentation]]
+  * **Community Tutorials**:
+    * [[https://www.tophattwaffle.com/tutorials/|TopHATTwaffle's Hammer Tutorials]]
+    * [[https://www.worldofleveldesign.com/categories/csgo-level-design.php|World of Level Design]]
+  * **Forums and Support**:
+    * [[https://www.mapcore.org/|MapCore Forums]]
+    * [[https://discord.gg/sourceengine|Source Engine Discord Server]]
+  * **Tools**:
+    * [[https://github.com/ruarai/CompilePal|CompilePal]]: A powerful compile tool with support for instances and advanced features.
+    * [[https://www.riintouge.com/VIDE/|VIDE]]: A tool for managing and embedding assets in your map.
+    * [[https://github.com/ata4/bspsrc|BSPSource]]: Decompiler for Source engine maps.
