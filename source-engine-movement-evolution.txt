@@ -1,0 +1,336 @@
+// https://rampsliders.wiki/doku.php?id=games:source
+==== Source Engine Evolution: Movement and Physics (2004-Present) ====
+
+The Source engine stands as one of the most influential game engines of the modern era, powering numerous landmark titles including Half-Life 2, Portal, and the Counter-Strike series. Since its debut in 2004, the engine's movement and physics systems have undergone continuous refinement, establishing new standards for first-person gameplay mechanics. This technical evolution reflects not just improvements in computing capability, but also changing player expectations and gameplay design philosophies. From its initial release to its final iterations, each version of the Source engine brought significant changes to how players interact with virtual environments, particularly in the realm of movement mechanics and physics simulation.
+This document chronicles the technical evolution of player movement and physics systems across major Source engine branches, from the foundation laid in 2004 through the sophisticated implementations seen in Counter-Strike: Global Offensive. By examining these changes chronologically, we can understand how Valve's approach to movement mechanics evolved and how technical constraints shaped the player experience in Source-powered games.
+
+----
+
+=== I. Source 2004 ===
+
+The Source engine (2004) represented a complete rewrite of the movement system from GoldSrc, introducing numerous fundamental changes to player physics and movement mechanics.
+
+  * Movement Mechanics:
+    * Implemented a more precise physics step system with proper frame timing (using gpGlobals->frametime)
+    * Added movement optimization flags and interval checking for performance
+    * Introduced a more sophisticated ground classification system with surface properties
+    * Enhanced stuck detection and resolution system with 54 predefined test positions
+    * Added movement speed modifiers based on surface friction and player state
+    * Introduced constraint handling for player movement boundaries
+    * Implemented more granular water movement physics
+
+  * Physics Calculations:
+    * Revised air acceleration calculations with more precise control
+    * Added velocity validation and clamping checks (CheckVelocity)
+    * Implemented new friction calculations considering surface properties
+    * Enhanced collision resolution with proper bounce handling
+    * Added movement optimization flags for better performance
+    * Introduced proper base velocity handling for moving platforms
+    * Added step smoothing for more fluid movement up stairs
+    * Implemented proper player hull transitions during ducking
+
+  * Player States:
+    * Added more sophisticated ducking mechanics with proper transitions
+    * Implemented new ladder movement system with better physics
+    * Enhanced swimming mechanics with improved water level detection
+    * Added proper step sound handling based on surface materials
+    * Introduced view offset interpolation for smooth camera movement
+    * Added player punch angle decay system
+    * Implemented more precise jump mechanics with proper gravity
+
+  * Technical Improvements:
+    * Added proper trace filtering with collision groups
+    * Implemented categorized position updates
+    * Added movement validation and anti-cheat checks
+    * Introduced debug systems for movement troubleshooting
+    * Added proper client-side prediction support
+    * Implemented surface property system for material-based physics
+
+The Source 2004 movement system represented a significant technological leap from GoldSrc. While maintaining similar basic concepts, it implemented them with much greater precision and sophistication. The movement mechanics were designed to feel more physically accurate while still preserving gameplay responsiveness.
+
+Key architectural changes included:
+  * Moving from direct velocity modifications to proper physics step calculations
+  * Adding surface property system for material-based movement effects
+  * Implementing proper client-side prediction
+  * Adding more sophisticated collision resolution
+  * Introducing proper frame timing for movement calculations
+
+These changes resulted in more consistent and predictable movement behavior, though some players noted it felt less "snappy" than GoldSrc. The new system prioritized physical accuracy and consistency over the more arcade-like feel of GoldSrc movement.
+
+The enhanced movement code also provided better support for the physics-based gameplay that Half-Life 2 would showcase, with proper handling of moving platforms, physics objects, and player interactions with the environment.
+
+----
+
+=== II. Source 2006 ===
+
+Also known as the Episode One engine branch, first used in Half-Life 2: Lost Coast and Day of Defeat: Source in 2005, but officially released in 2006 with Half-Life 2: Episode One.
+
+  * Movement Updates:
+    * Enhanced quadrant-based ground detection to improve surface interaction
+    * Refined ducking mechanics with improved transitions and timing
+    * More sophisticated handling of duck-jumping, including better eye offset interpolation
+    * Added upward movement boost when swimming forward
+    * Added velocity adjustment when landing on moving/descending platforms
+    * Added new crouch-toggle functionality for XBOX version
+    * Modified friction handling for ducked movement, with platform-specific optimizations
+    * Improved air control calculations
+    * Refined ground friction calculations affecting direction changes and stopping
+
+  * Physics and Collision Improvements:
+    * Enhanced collision detection using quadrant-based surface checking
+    * Improved water physics with enhanced upward movement
+    * Better handling of moving platform interactions
+    * More accurate fall damage calculations accounting for platform movement
+    * Fixed various edge cases in player-world collision
+
+  * Bug Fixes and Technical Improvements:
+    * Fixed view height getting stuck at ducked position
+    * Improved unduck transition timing calculations
+    * Enhanced movement optimization system (g_bMovementOptimizations)
+    * Added numerous debug assertions and improved error messaging
+    * Fixed issues with ground entity velocity transfer
+
+  * New Features:
+    * Added XBOX-specific movement adjustments and hint system
+    * High Dynamic Range (HDR) rendering
+    * Upgraded facial animation system
+    * Enhanced feedback systems for player movement states
+
+While retaining the core movement feel of Source 2004, these changes collectively represented a significant refinement of the movement system. The improvements to ground detection, ducking mechanics, and platform interactions made movement feel more reliable and precise. The enhanced collision and physics systems reduced frustrating edge cases where players would get stuck or experience unexpected behavior. Though some changes were subtle, they had lasting implications for both casual gameplay and advanced movement techniques.
+
+The introduction of HDR rendering and other technical improvements, while not directly movement-related, had significant indirect effects on gameplay and led to the discovery of new movement exploits. The XBOX-specific modifications also marked an important step in adapting Source's movement systems for console players.
+
+----
+
+=== III. Source 2007 (Orange Box) ===
+
+Released in October 2007 with The Orange Box, including Half-Life 2: Episode Two, Team Fortress 2, and Portal.
+
+  * Movement Mechanics:
+    * Implemented new stuck detection system with separate intervals for single-player (0.2s) and multiplayer (1.0s)
+    * Added sophisticated movement optimizations with point content caching
+    * Improved water movement with better transition handling and splash effects
+    * Enhanced ducking mechanics with smoother transitions and better collision resolution
+
+  * Physics Updates:
+    * Refined ground friction calculations incorporating bounce parameters
+    * Improved slope handling and ground categorization
+    * Enhanced player-ground velocity inheritance system
+    * Added more precise collision checks for stuck detection
+
+  * Performance Improvements:
+    * Added conditional movement optimizations via g_bMovementOptimizations
+    * Implemented point content caching to reduce redundant checks
+    * Optimized ground movement calculations
+    * Added more efficient player position validation
+
+  * Platform-Specific Features:
+    * Added Xbox-specific crouch toggle functionality
+    * Implemented controller-specific movement adjustments
+    * Added platform-specific movement hints system
+
+This update focused on technical refinements rather than dramatic gameplay changes. The emphasis was on improving performance, making movement more reliable, and enhancing the precision of physics interactions. The changes resulted in more consistent player movement across different environments and improved handling of edge cases like stuck detection and water transitions.
+
+----
+
+=== V. Source 2013 (SteamPipe) ===
+
+The final iteration of the Orange Box engine branch brought significant technical refinements to player movement and physics systems.
+
+**Improved Movement Optimizations:**
+  * Added movement optimization system for better performance
+  * Optimized vector calculations and collision checks
+  * More efficient ground detection and surface interaction
+
+**Enhanced Player Movement:**
+  * Refined duck mechanics and state transitions
+  * Better handling of duck-jump sequences
+  * Improved ladder and water movement detection
+
+**Physics System Refinements:**
+  * Enhanced collision resolution systems
+  * Support for scaled player hull sizes
+  * More robust stuck detection and resolution
+  * Improved player-world physics interactions
+
+**Stability Enhancements:**
+  * More consistent movement behavior across different frame rates
+  * Better handling of edge cases in physics calculations
+  * Improved prediction and networking of movement states
+
+**Performance Optimizations:**
+  * Reduced redundant calculations in movement code
+  * More efficient collision testing
+  * Better memory usage for movement systems
+
+**Development Infrastructure:**
+  * VPK file format support for better mod distribution
+  * Enhanced Linux compatibility
+  * Improved development tools and debugging capabilities
+  * Better support for community modifications
+
+These changes resulted in more stable and consistent movement mechanics while maintaining compatibility with existing Source engine games and mods. The improvements to technical infrastructure also made it easier for the modding community to create custom movement modifications.
+
+----
+
+=== CS:GO Game Movement Improvements ===
+
+While built on the Source engine, Counter-Strike: Global Offensive (CS:GO) introduced significant improvements to its movement system compared to earlier Source engine games.
+
+**Performance Optimizations:**
+  * Introduction of TraceListData optimization system allowing for more efficient collision traces within bounded areas
+  * Implementation of a sophisticated point content caching system using slots for different query types
+  * Added movement bound calculations via SetupMovementBounds() to optimize trace operations
+  * More aggressive optimization of CategorizePosition() calls when player state is unlikely to have changed
+  * Improved trace filtering system with a new CTraceFilterSkipTwoEntitiesAndCheckTeamMask class
+
+**Enhanced Movement Mechanics:**
+  * Refined air acceleration calculation with a new constant kAccelerationScale (250.0f)
+  * More precise stuck player detection and resolution
+  * Enhanced ladder movement with:
+    * New OnStartMoveTypeLadder() function for smoother ladder transitions
+    * Improved ladder grab detection when falling near edges
+    * IGNORE_JUMP_TIME (0.2s) buffer to prevent bouncing off ladders
+  * Improved player unstuck testing with additional validity checks
+
+**Physics and Collision Improvements:**
+  * Enhanced ClipVelocity function with better handling of minimum move fractions
+  * New CheckValidStandableGroundCandidate() function for more precise ground detection
+  * Added MINIMUM_MOVE_FRACTION (0.0001f) constant to prevent precision issues
+  * Improved handling of near-horizontal surfaces with EFFECTIVELY_HORIZONTAL_NORMAL_Z
+  * Better team-based collision handling through enhanced trace filters
+
+**Water Interaction Refinements:**
+  * More sophisticated water level checking with cached point contents
+  * Improved water transition handling
+  * Better integration with prediction system for water movement
+  * Enhanced categorization of water positions
+
+**Movement State Management:**
+  * Added m_bProcessingMovement flag for better state tracking
+  * Improved handling of movement type transitions
+  * More precise ducking state management with millisecond-precision timers
+  * Enhanced ground entity handling with better friction calculations
+
+**Duck System Overhaul:**
+  * Conversion of duck timing system from seconds to milliseconds for higher precision
+  * Added duck jump time tracking
+  * Improved unduck transition handling
+  * Better collision checking during duck transitions
+
+**Debugging and Validation:**
+  * Enhanced prediction error checking system
+  * More comprehensive movement validation
+  * Improved trace counting and performance monitoring
+  * Better handling of edge cases and error conditions
+
+**Code Quality Improvements:**
+  * More consistent error handling
+  * Better code organization with logical grouping of related functions
+  * Improved commenting and documentation
+  * More robust parameter validation
+
+**Specific Numerical Changes:**
+  * Modified air acceleration values
+  * Adjusted ground friction calculations
+  * Refined stuck detection thresholds
+  * Updated view punch calculations
+
+**Platform-Specific Optimizations:**
+  * Xbox-specific movement optimizations
+  * Platform-aware performance adjustments
+  * Console-specific control handling
+
+----
+
+=== CS:S Mod-Specific Overrides ===
+
+Counter-Strike's unique movement mechanics are implemented through several key overrides of the base Source engine movement code. Let's examine the main differences:
+
+**Stamina System:**
+  * Maximum stamina is 100 units 
+  * Jumping costs 25 stamina
+  * Falls cost 20 stamina
+  * Stamina recovers at 19 units per second
+  * Reduced stamina results in lower jump height and slower movement
+
+**Bunny Hopping Controls:**
+  * A default speed cap of 1.1x the player's max speed (controlled by ''sv_enablebunnyhopping'')
+  * The stamina system naturally limiting consecutive jumps
+  * Air velocity is scaled down based on remaining stamina
+
+**Duck (Crouch) Mechanics:**
+  * Enforces minimum time between duck commands via ''sv_timebetweenducks'' 
+  * Automatic duck-jumping for bots/hostages
+  * Special handling for ducking on ladders (slower climb speed)
+  * Modified duck speed penalties
+
+**Ladder Movement:**
+  * Slower movement while ducking on ladders
+  * 50% reduced lateral movement speed
+  * Enhanced ladder detection when falling past ladders
+  * Suppression of redundant ladder checks
+
+**Velocity Control:**
+  * Walking speed reduced to a fixed percentage while holding walk key
+  * Scaled speed penalties while ducked
+  * Custom speed scaling based on player state and surface friction
+
+---- 
+
+=== CS:GO Mod Specific Overrides ===
+
+Counter-Strike: Global Offensive introduced significant refinements to CS:S movement overrides, building upon CS:S's foundation while adding new mechanics and improving existing ones.
+
+**Stamina System Refinements:**
+  * More configurable stamina values via new ConVars
+  * ''sv_staminajumpcost'' controls jump stamina penalty
+  * ''sv_staminalandcost'' controls landing impact
+  * ''sv_staminarecoveryrate'' defines recovery speed
+  * Maximum stamina now capped at 80 (down from 100)
+
+**Duck Mechanics Overhaul:**
+  * New duck speed system with anti-spam measures
+  * Ducking speed moderated by ''m_flDuckSpeed''
+  * Position-based duck speed recovery
+  * Improved duck state transitions
+  * Better handling of edge cases in ducking animations
+
+**Acceleration Changes:**
+  * New acceleration calculation system
+  * Weapon-specific acceleration values
+  * Movement state tracking (IDLE, WALK, RUN)
+  * Improved acceleration curves based on current speed
+  * Better handling of counter-strafing
+
+**Physics Refinements:**
+  * Enhanced collision detection for ducking
+  * Improved ground detection
+  * Better handling of player stacking
+  * More precise movement speed modifications
+
+**New Movement States:**
+  * Added MOVESTATE system (IDLE, WALK, RUN)
+  * Improved state transitions
+  * Better handling of opposing movement inputs
+  * Enhanced walk/run differentiation
+
+**Advanced Features:**
+  * Trailing velocity system for movement analysis
+  * Improved weapon accuracy during movement
+  * New fishtail mechanic for extreme direction changes
+  * Enhanced movement speed scaling based on weapon type
+
+----
+
+=== Conclusion ===
+
+The Source engine's evolution from 2004 to present represents a remarkable journey in game physics and movement system development. What began as a complete rewrite of the GoldSrc engine grew into a sophisticated platform that would define player movement mechanics for nearly two decades. Each iteration brought not just technical improvements, but also reflected changing philosophies about how players should interact with virtual environments.
+The engine's development path reveals clear patterns: early versions established fundamental systems and prioritized physical accuracy, middle iterations focused on refinement and platform expansion, and later versions emphasized optimization and specific game needs, particularly in titles like CS:GO. Throughout this evolution, Valve maintained a delicate balance between physical realism and gameplay responsiveness, often making subtle adjustments that had profound effects on player experience.
+Perhaps most notably, the Source engine's movement systems proved remarkably adaptable, supporting everything from the physics puzzles of Portal to the precise competitive requirements of Counter-Strike. This versatility, combined with the engine's longevity and continued community support, cements its place as a pivotal technology in gaming history. Even as newer engines emerge, the principles and solutions developed during Source's evolution continue to influence modern game design and movement mechanics.
+
+----
+
+=== Resources ===
+
+[[https://github.com/followingthefasciaplane/source-engine-diff-check/tree/main/collection|GitHub Archive containing a collection of the game movement code from various iterations of the Source engine]]
